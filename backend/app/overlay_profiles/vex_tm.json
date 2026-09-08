@@ -1,0 +1,11 @@
+{
+  "name": "vex_tm",
+  "description": "VEX Tournament Manager audience-display / OBS overlay (common at regional and college events, incl. many VEXU streams). Match label + number top-left of the header bar, clock top-right, alliance panels in the bottom corners. Note: some events run this overlay with a frozen clock, so Scout Hub falls back to detecting the match-number label. Tune the rectangles + re-process for a specific event.",
+  "match_label_region": [0.200, 0.000, 0.340, 0.120],
+  "timer_region": [0.645, 0.000, 0.780, 0.110],
+  "red_teams_region": [0.000, 0.880, 0.200, 1.000],
+  "blue_teams_region": [0.800, 0.880, 1.000, 1.000],
+  "red_score_region": [0.160, 0.880, 0.320, 1.000],
+  "blue_score_region": [0.680, 0.880, 0.840, 1.000],
+  "timer_invert": false
+}

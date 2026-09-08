@@ -1,0 +1,21 @@
+services:
+  scouthub:
+    build: .
+    image: scout-hub:local
+    container_name: scout-hub
+    ports:
+      - "8000:8000"
+    volumes:
+      # App database + scratch. Keep this on fast local storage.
+      - ./data:/data
+      # >>> CHANGE THE LEFT SIDE <<<
+      # Point this at wherever recordings and match clips should be archived
+      # (a NAS share, a big disk, etc). It is mounted at /media in the container,
+      # and the in-app folder picker browses inside it.
+      - ./media:/media
+    environment:
+      SCOUTHUB_ARCHIVE_ROOT: /media
+      SCOUTHUB_DATA_DIR: /data
+      # Optional: seed the RobotEvents token here instead of the Settings page.
+      # SCOUTHUB_ROBOTEVENTS_TOKEN: "your-token"
+    restart: unless-stopped
