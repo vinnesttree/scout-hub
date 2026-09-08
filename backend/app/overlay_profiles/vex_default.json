@@ -1,0 +1,10 @@
+{
+  "name": "vex_default",
+  "description": "Generic VEX broadcast overlay (VRC / VEXU). Match timer centered near the top; alliance panels along the bottom third. Tune these in the calibration screen for a specific event's layout, then re-process.",
+  "timer_region": [0.420, 0.010, 0.580, 0.130],
+  "red_teams_region": [0.060, 0.800, 0.340, 0.970],
+  "blue_teams_region": [0.660, 0.800, 0.940, 0.970],
+  "red_score_region": [0.350, 0.800, 0.450, 0.970],
+  "blue_score_region": [0.550, 0.800, 0.650, 0.970],
+  "timer_invert": false
+}

@@ -1,0 +1,13 @@
+# Runtime deps. The Docker image pins Python 3.12; these ranges also resolve on 3.13/3.14.
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30
+sqlmodel>=0.0.22
+httpx>=0.27
+pydantic-settings>=2.5
+APScheduler>=3.10,<4.0
+python-multipart>=0.0.9
+numpy>=1.26
+opencv-python-headless>=4.9
+Pillow>=10.2
+pytesseract>=0.3.13
+yt-dlp>=2024.11.18
