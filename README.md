@@ -67,6 +67,9 @@ recording (full stream)  ──►  detect match windows (timer OCR)
 7. Processing runs automatically. Watch it under *Recent processing jobs*, then
    open **Match Library**.
 
+**TrueNAS / Dockge:** see [`deploy/dockge/`](deploy/dockge/README.md) for a
+ready-to-paste stack that builds from GitHub and stores everything on a dataset.
+
 ### Processing time & when to trim
 
 Detection OCRs sampled frames (spawning `tesseract`), so it runs at very roughly

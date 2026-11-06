@@ -1,0 +1,43 @@
+# Scout Hub — Dockge stack for TrueNAS SCALE
+#
+# Drop this folder into your Dockge stacks directory (or paste this file into
+# Dockge's "+ Compose" editor and the .env contents into its .env panel), then
+# press Deploy. See deploy/dockge/README.md in the repo for the full walkthrough.
+#
+# The image is built straight from the GitHub repo, so no local checkout is
+# needed. `pull_policy: build` makes Dockge's "Update" button rebuild from the
+# latest commit on SCOUTHUB_GIT_REF.
+
+services:
+  scouthub:
+    build:
+      context: https://github.com/vinnesttree/scout-hub.git#${SCOUTHUB_GIT_REF:-main}
+    image: scout-hub:${SCOUTHUB_GIT_REF:-main}
+    pull_policy: build
+    container_name: scout-hub
+    # Run as the TrueNAS "apps" user (568) by default so files written to the
+    # dataset are not root-owned. Change PUID/PGID in .env to match the owner of
+    # your dataset.
+    user: "${PUID:-568}:${PGID:-568}"
+    ports:
+      - "${SCOUTHUB_PORT:-8000}:8000"
+    volumes:
+      # SQLite database + per-user overlay profiles.
+      - ${SCOUTHUB_DATASET:-/mnt/ScoutData}/data:/data
+      # Recordings and match clips. The in-app folder picker browses /media.
+      - ${SCOUTHUB_DATASET:-/mnt/ScoutData}/media:/media
+    environment:
+      SCOUTHUB_ARCHIVE_ROOT: /media
+      SCOUTHUB_DATA_DIR: /data
+      # The image has no home dir for a non-root user; give yt-dlp a writable one.
+      HOME: /data
+      TZ: ${TZ:-Etc/UTC}
+      # Optional: seed the RobotEvents token (can also be set in the Settings page).
+      SCOUTHUB_ROBOTEVENTS_TOKEN: ${SCOUTHUB_ROBOTEVENTS_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=10)"]
+      interval: 60s
+      timeout: 15s
+      start_period: 30s
+      retries: 3
+    restart: unless-stopped

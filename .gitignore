@@ -21,3 +21,6 @@ media/*
 .DS_Store
 .idea/
 .vscode/
+
+# Dockge stack env (copy of .env.example; may hold the RobotEvents token)
+deploy/dockge/**/.env
