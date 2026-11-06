@@ -16,8 +16,9 @@ services:
     environment:
       SCOUTHUB_ARCHIVE_ROOT: /media
       SCOUTHUB_DATA_DIR: /data
-      # VEX Events API key. When set, it overrides any key entered on the
-      # Settings page. (VEX_EVENTS_API_KEY works too.) Or put it in a .env file
-      # next to this compose file and use: SCOUTHUB_VEXEVENTS_TOKEN: ${VEX_EVENTS_API_KEY}
-      # SCOUTHUB_VEXEVENTS_TOKEN: "your-key"
+      # VEX Events API key, read from the .env file next to this compose file
+      # (in Dockge: the stack's ".env" box) as:  VEX_EVENTS_API_KEY=your-key
+      # When set it overrides any key entered on the Settings page; when unset
+      # the Settings page key is used.
+      SCOUTHUB_VEXEVENTS_TOKEN: ${VEX_EVENTS_API_KEY:-}
     restart: unless-stopped

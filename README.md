@@ -57,9 +57,10 @@ recording (full stream)  ──►  detect match windows (timer OCR)
    ```
 3. Open `http://<host>:8000`.
 4. **VEX Events API key** (free, from your events.vex.com account). Either:
-   - set it in `docker-compose.yml` → `SCOUTHUB_VEXEVENTS_TOKEN: "your-key"` (or
-     `VEX_EVENTS_API_KEY`) and `docker compose up -d` — **the environment variable
-     always wins** over a key typed in the web UI; or
+   - put `VEX_EVENTS_API_KEY=your-key` in a `.env` file next to
+     `docker-compose.yml` (in **Dockge**: the stack's *.env* box), then redeploy —
+     the compose file passes it to the app as `SCOUTHUB_VEXEVENTS_TOKEN`, and it
+     **always wins** over a key typed in the web UI; or
    - paste it in **Settings → VEX Events API**.
 
    Then hit *Test connection* there; it says which key (environment or Settings
