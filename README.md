@@ -56,9 +56,15 @@ recording (full stream)  ──►  detect match windows (timer OCR)
    docker compose up -d --build
    ```
 3. Open `http://<host>:8000`.
-4. **Settings → VEX Events API**: paste a token (free, from your events.vex.com
-   account), hit *Test connection*. (A token saved under the old RobotEvents
-   setting keeps being used until you enter a new one.)
+4. **VEX Events API key** (free, from your events.vex.com account). Either:
+   - set it in `docker-compose.yml` → `SCOUTHUB_VEXEVENTS_TOKEN: "your-key"` (or
+     `VEX_EVENTS_API_KEY`) and `docker compose up -d` — **the environment variable
+     always wins** over a key typed in the web UI; or
+   - paste it in **Settings → VEX Events API**.
+
+   Then hit *Test connection* there; it says which key (environment or Settings
+   page) it used. A key saved under the old RobotEvents setting is still used if
+   nothing else is set.
 5. **Recordings → New recording**: paste the stream link (a live stream *or* an
    archived YouTube/Twitch video) and, optionally, the event's **events.vex.com
    link** (or its code, e.g. `RE-V5RC-26-4058`). The event is looked up and

@@ -66,11 +66,24 @@ export default function Settings() {
           Enables authoritative team lists and final scores.
         </p>
         <div className="row">
-          <div className="field" style={{ flex: 1 }}>
-            <label>API token {s?.vexevents_token_set && <span className="badge ok">stored</span>}</label>
-            <input type="password" value={token} placeholder={s?.vexevents_token_set ? "•••••••• (leave blank to keep)" : "paste token"}
-              onChange={(e) => setToken(e.target.value)} />
-          </div>
+          {s?.vexevents_token_source === "env" ? (
+            <div className="field" style={{ flex: 1 }}>
+              <label>API key <span className="badge ok">from environment</span></label>
+              <div className="muted" style={{ fontSize: 13 }}>
+                Using the key from the <code>SCOUTHUB_VEXEVENTS_TOKEN</code> /{" "}
+                <code>VEX_EVENTS_API_KEY</code> environment variable. Unset it to manage the key here.
+              </div>
+            </div>
+          ) : (
+            <div className="field" style={{ flex: 1 }}>
+              <label>API key {s?.vexevents_token_set && <span className="badge ok">stored</span>}</label>
+              <input type="password" value={token} placeholder={s?.vexevents_token_set ? "•••••••• (leave blank to keep)" : "paste key"}
+                onChange={(e) => setToken(e.target.value)} />
+              <div className="muted" style={{ fontSize: 12 }}>
+                Or set <code>SCOUTHUB_VEXEVENTS_TOKEN</code> in the environment (docker-compose.yml) — it overrides this.
+              </div>
+            </div>
+          )}
           <button onClick={() => testVE.mutate()} disabled={testVE.isPending}>Test connection</button>
         </div>
         {testVE.isSuccess && <p className="badge ok">VEX Events reachable ✓</p>}

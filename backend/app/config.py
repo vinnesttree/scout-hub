@@ -9,6 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,8 +25,13 @@ class Settings(BaseSettings):
     # Holds the SQLite database and any scratch files.
     data_dir: Path = Path("/data")
 
-    # --- external services (defaults; overridable in the Settings page) --
-    vexevents_token: str = ""
+    # --- external services -------------------------------------------------
+    # VEX Events API key. When set via the environment it takes priority over
+    # anything saved on the Settings page. Either variable name works.
+    vexevents_token: str = Field(
+        default="",
+        validation_alias=AliasChoices("SCOUTHUB_VEXEVENTS_TOKEN", "VEX_EVENTS_API_KEY"),
+    )
     vexevents_base_url: str = "https://events.vex.com/api/v2"
     # Legacy name (pre-VEX Events); used only if SCOUTHUB_VEXEVENTS_TOKEN is unset.
     robotevents_token: str = ""

@@ -16,6 +16,8 @@ services:
     environment:
       SCOUTHUB_ARCHIVE_ROOT: /media
       SCOUTHUB_DATA_DIR: /data
-      # Optional: seed the VEX Events API token here instead of the Settings page.
-      # SCOUTHUB_VEXEVENTS_TOKEN: "your-token"
+      # VEX Events API key. When set, it overrides any key entered on the
+      # Settings page. (VEX_EVENTS_API_KEY works too.) Or put it in a .env file
+      # next to this compose file and use: SCOUTHUB_VEXEVENTS_TOKEN: ${VEX_EVENTS_API_KEY}
+      # SCOUTHUB_VEXEVENTS_TOKEN: "your-key"
     restart: unless-stopped

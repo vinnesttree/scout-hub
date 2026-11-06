@@ -166,3 +166,20 @@ def test_create_recording_bad_event_is_rejected(client, monkeypatch):
     })
     assert r.status_code == 400
     assert "event code" in r.json()["detail"]
+
+
+def test_env_api_key_overrides_settings_page(client, monkeypatch):
+    from app.config import get_settings
+    from app.db import session_scope
+    from app.services import settings_store
+
+    client.put("/api/settings", json={"vexevents_token": "ui-key"})
+    monkeypatch.setattr(get_settings(), "vexevents_token", "env-key")
+    with session_scope() as s:
+        assert settings_store.get(s, "vexevents_token") == "env-key"
+    body = client.get("/api/settings").json()
+    assert body["vexevents_token_source"] == "env"
+    assert "env-key" not in str(body)
+
+    monkeypatch.setattr(get_settings(), "vexevents_token", "")
+    assert client.get("/api/settings").json()["vexevents_token_source"] == "settings"

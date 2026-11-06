@@ -41,12 +41,18 @@ def update_settings(body: SettingsIn, session: Session = Depends(get_session)) -
 
 @router.post("/settings/test-vexevents")
 def test_vexevents(session: Session = Depends(get_session)) -> dict:
-    token = settings_store.get(session, "vexevents_token")
+    cfg = settings_store.get_all(session)
+    source = {"env": "environment variable", "settings": "Settings page"}.get(
+        cfg["vexevents_token_source"], ""
+    )
     try:
-        VexEventsClient(token=token or None).ping()
-        return {"ok": True}
+        VexEventsClient(token=cfg["vexevents_token"] or None).ping()
+        return {"ok": True, "source": cfg["vexevents_token_source"]}
     except VexEventsError as exc:
-        raise HTTPException(400, str(exc))
+        detail = str(exc)
+        if source:
+            detail += f" (key from the {source}, sent to {cfg['vexevents_base_url']})"
+        raise HTTPException(400, detail)
 
 
 # --- /media folder picker -----------------------------------------

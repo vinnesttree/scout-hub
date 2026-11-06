@@ -31,6 +31,8 @@ export interface Health {
 export interface AppSettings {
   vexevents_token: string;
   vexevents_token_set: boolean;
+  /** "env" = SCOUTHUB_VEXEVENTS_TOKEN / VEX_EVENTS_API_KEY is set and wins. */
+  vexevents_token_source: "env" | "settings" | "none";
   clip_pad_start_s: number;
   clip_pad_end_s: number;
   sample_fps: number;
@@ -91,7 +93,7 @@ export const api = {
   putSettings: (body: Partial<AppSettings>) =>
     req<AppSettings>("/api/settings", { method: "PUT", body: JSON.stringify(body) }),
   testVexEvents: () =>
-    req<{ ok: boolean }>("/api/settings/test-vexevents", { method: "POST" }),
+    req<{ ok: boolean; source: string }>("/api/settings/test-vexevents", { method: "POST" }),
 
   listDirs: (path?: string) =>
     req<DirListing>("/api/fs/dirs" + (path ? `?path=${encodeURIComponent(path)}` : "")),

@@ -36,6 +36,15 @@ class VexEventsError(RuntimeError):
 _SKU_RE = re.compile(r"\b(RE-[A-Z0-9]+-\d{2}-\d+)\b", re.IGNORECASE)
 
 
+def normalize_token(raw: str) -> str:
+    """Clean up a pasted key: whitespace/newlines, surrounding quotes, and a
+    leading "Bearer " (we add that ourselves)."""
+    tok = (raw or "").strip().strip("'\"").strip()
+    if tok.lower().startswith("bearer "):
+        tok = tok[7:].strip()
+    return "".join(tok.split())
+
+
 def extract_sku(text: str) -> str | None:
     """Pull an event code out of a bare code or an event page link.
 
@@ -122,12 +131,15 @@ def _check(resp: httpx.Response) -> None:
 class VexEventsClient:
     def __init__(self, token: str | None = None, base_url: str | None = None) -> None:
         cfg = get_settings()
-        self.token = (token or cfg.vexevents_token or "").strip()
+        self.token = normalize_token(token or cfg.vexevents_token or "")
         self.base_url = (base_url or cfg.vexevents_base_url).rstrip("/")
 
     def _client(self) -> httpx.Client:
         if not self.token:
-            raise VexEventsError("No VEX Events API token configured (Settings page).")
+            raise VexEventsError(
+                "No VEX Events API key configured. Set SCOUTHUB_VEXEVENTS_TOKEN (or "
+                "VEX_EVENTS_API_KEY) in the environment, or enter it on the Settings page."
+            )
         return httpx.Client(
             base_url=self.base_url,
             headers={

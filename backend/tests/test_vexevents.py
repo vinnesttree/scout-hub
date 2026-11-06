@@ -150,3 +150,29 @@ def test_network_failure_becomes_vexevents_error():
     respx.get(f"{BASE}/events").mock(side_effect=httpx.ConnectError("boom"))
     with pytest.raises(VexEventsError, match="reach VEX Events"):
         _client().find_event("RE-V5RC-26-4058")
+
+
+@pytest.mark.parametrize("env_name", ["SCOUTHUB_VEXEVENTS_TOKEN", "VEX_EVENTS_API_KEY"])
+def test_api_key_env_var_names(monkeypatch, env_name):
+    from app.config import Settings
+
+    monkeypatch.delenv("SCOUTHUB_VEXEVENTS_TOKEN", raising=False)
+    monkeypatch.delenv("VEX_EVENTS_API_KEY", raising=False)
+    monkeypatch.setenv(env_name, "abc123")
+    assert Settings().vexevents_token == "abc123"
+
+
+@pytest.mark.parametrize(
+    "raw", ["abc123", "  abc123\n", '"abc123"', "Bearer abc123", "bearer  abc123 "]
+)
+def test_token_is_normalized(raw):
+    from app.services.vexevents import normalize_token
+
+    assert normalize_token(raw) == "abc123"
+
+
+@respx.mock
+def test_bearer_header_sent():
+    route = respx.get(f"{BASE}/seasons").mock(return_value=httpx.Response(200, json={"data": []}))
+    VexEventsClient(token="Bearer abc123", base_url=BASE).ping()
+    assert route.calls.last.request.headers["Authorization"] == "Bearer abc123"

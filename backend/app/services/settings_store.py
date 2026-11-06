@@ -68,12 +68,24 @@ def get_all(session: Session) -> dict[str, Any]:
             out[key] = _parse(overrides[key], knob.cast)
         else:
             out[key] = getattr(cfg, key)
-    if not out["vexevents_token"] and cfg.robotevents_token:
-        out["vexevents_token"] = cfg.robotevents_token
+    # An API key from the environment always wins over the Settings page.
+    env_token = env_vexevents_token()
+    if env_token:
+        out["vexevents_token"] = env_token
+        out["vexevents_token_source"] = "env"
+    else:
+        out["vexevents_token_source"] = "settings" if out["vexevents_token"] else "none"
     # Non-editable but useful for the UI.
     out["archive_root"] = str(cfg.archive_root)
     out["vexevents_base_url"] = cfg.vexevents_base_url
     return out
+
+
+def env_vexevents_token() -> str:
+    """The VEX Events key from SCOUTHUB_VEXEVENTS_TOKEN / VEX_EVENTS_API_KEY (or the
+    legacy SCOUTHUB_ROBOTEVENTS_TOKEN), or "" if none is set."""
+    cfg = get_settings()
+    return (cfg.vexevents_token or cfg.robotevents_token or "").strip()
 
 
 def get(session: Session, key: str) -> Any:
