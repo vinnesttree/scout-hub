@@ -3,6 +3,17 @@
 VEX Events replaced RobotEvents in 2026; the v2 API kept the same endpoints and
 response shapes, only the host changed. Auth is a personal bearer token from an
 events.vex.com account.
+
+Endpoints used (per the official OpenAPI spec, swagger.yml "Public VEX Events
+API" v1.0.21; servers: https://events.vex.com/api/v2):
+
+- ``GET /events?sku[]=<sku>``                          -> PaginatedEvent
+- ``GET /events/{id}``                                 -> Event (with ``divisions``)
+- ``GET /events/{id}/divisions/{div}/matches``         -> PaginatedMatch
+- ``GET /seasons?per_page=1``                          -> connection check
+
+There is no event-wide matches endpoint; matches are listed per division.
+Pagination: ``page`` / ``per_page`` (max 250), ``meta.current_page`` / ``meta.last_page``.
 """
 
 from __future__ import annotations
@@ -15,17 +26,20 @@ import httpx
 
 from app.config import get_settings
 
+# MatchObj.round, per the spec: 1 Practice, 2 Qualification, 3 Quarter-Finals,
+# 4 Semi-Finals, 5 Finals, 6 Round of 16. 15 is "Top N" (VIQRC finals) and
+# 16 "Round Robin"; anything else is kept as "unknown".
 _ROUND_MAP = {
     1: "practice",
     2: "qual",
-    3: "r16",
-    4: "qf",
-    5: "sf",
-    6: "final",
-    # some seasons expose these ids
-    7: "r16",
+    3: "qf",
+    4: "sf",
+    5: "final",
+    6: "r16",
     15: "final",
 }
+# Play order of the stages, used to sort matches that have no scheduled time.
+_ROUND_ORDER = {"practice": 0, "qual": 1, "r16": 2, "qf": 3, "sf": 4, "final": 5, "unknown": 6}
 
 
 class VexEventsError(RuntimeError):
@@ -128,6 +142,19 @@ def _check(resp: httpx.Response) -> None:
         raise VexEventsError(f"VEX Events returned HTTP {resp.status_code}.")
 
 
+def _play_order(m: REMatch) -> tuple:
+    # Scheduled matches first, by time; unscheduled ones (often eliminations)
+    # after, by stage. Uses timestamps so naive/aware datetimes never compare.
+    ts = m.scheduled_at.timestamp() if m.scheduled_at else None
+    return (
+        ts is None,
+        ts or 0.0,
+        _ROUND_ORDER.get(m.round, 99),
+        m.instance or 0,
+        m.match_num or 0,
+    )
+
+
 class VexEventsClient:
     def __init__(self, token: str | None = None, base_url: str | None = None) -> None:
         cfg = get_settings()
@@ -196,14 +223,22 @@ class VexEventsClient:
         )
 
     def get_matches(self, re_event_id: int, division_id: int | None = None) -> list[REMatch]:
-        params: dict = {}
-        if division_id:
-            params["division[]"] = division_id
+        """All matches of an event (or of one division), in play order."""
         with self._client() as client:
-            rows = self._get_all(client, f"/events/{re_event_id}/matches", params)
+            if division_id:
+                division_ids = [division_id]
+            else:
+                resp = _get(client, f"/events/{re_event_id}", {})
+                _check(resp)
+                divisions = resp.json().get("divisions") or []
+                division_ids = [d["id"] for d in divisions if d.get("id") is not None]
+            rows: list[dict] = []
+            for div in division_ids:
+                rows.extend(
+                    self._get_all(client, f"/events/{re_event_id}/divisions/{div}/matches", {})
+                )
         matches = [self._match_from_row(r) for r in rows]
-        matches.sort(key=lambda m: (m.scheduled_at or datetime.max, m.round, m.instance or 0,
-                                    m.match_num or 0))
+        matches.sort(key=_play_order)
         return matches
 
     def _match_from_row(self, r: dict) -> REMatch:

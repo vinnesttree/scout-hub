@@ -42,7 +42,10 @@ def test_find_event_parses_fields():
 
 @respx.mock
 def test_get_matches_extracts_alliances_and_scores():
-    respx.get(f"{BASE}/events/55123/matches").mock(
+    respx.get(f"{BASE}/events/55123").mock(
+        return_value=httpx.Response(200, json={"id": 55123, "divisions": [{"id": 1, "name": "Div"}]})
+    )
+    respx.get(f"{BASE}/events/55123/divisions/1/matches").mock(
         return_value=httpx.Response(
             200,
             json={
@@ -176,3 +179,55 @@ def test_bearer_header_sent():
     route = respx.get(f"{BASE}/seasons").mock(return_value=httpx.Response(200, json={"data": []}))
     VexEventsClient(token="Bearer abc123", base_url=BASE).ping()
     assert route.calls.last.request.headers["Authorization"] == "Bearer abc123"
+
+
+def _m(mid, rnd, num, sched=None, inst=1, div=1):
+    return {"id": mid, "name": f"M{mid}", "round": rnd, "matchnum": num, "instance": inst,
+            "scheduled": sched, "started": None, "division": {"id": div, "name": "D"},
+            "alliances": []}
+
+
+@pytest.mark.parametrize(
+    "round_id, expected",
+    [(1, "practice"), (2, "qual"), (3, "qf"), (4, "sf"), (5, "final"), (6, "r16"),
+     (15, "final"), (16, "unknown"), (99, "unknown")],
+)
+def test_round_ids_follow_spec(round_id, expected):
+    assert _client()._match_from_row(_m(1, round_id, 1)).round == expected
+
+
+@respx.mock
+def test_get_matches_walks_every_division_and_orders_unscheduled_elims_last():
+    """Per the spec matches only exist under /events/{id}/divisions/{div}/matches."""
+    respx.get(f"{BASE}/events/7").mock(return_value=httpx.Response(200, json={
+        "id": 7, "divisions": [{"id": 1, "name": "Science"}, {"id": 2, "name": "Tech"}]}))
+    d1 = respx.get(f"{BASE}/events/7/divisions/1/matches").mock(return_value=httpx.Response(200, json={
+        "data": [_m(11, 5, 1), _m(12, 2, 1, "2026-02-14T09:00:00-05:00"), _m(13, 4, 1)],
+        "meta": {"current_page": 1, "last_page": 1}}))
+    d2 = respx.get(f"{BASE}/events/7/divisions/2/matches").mock(return_value=httpx.Response(200, json={
+        "data": [_m(21, 2, 1, "2026-02-14T09:05:00-05:00", div=2)],
+        "meta": {"current_page": 1, "last_page": 1}}))
+    matches = _client().get_matches(7)
+    assert d1.called and d2.called
+    assert d1.calls.last.request.url.params["per_page"] == "250"
+    assert [m.re_match_id for m in matches] == [12, 21, 13, 11]  # quals by time, then SF, F
+
+
+@respx.mock
+def test_get_matches_single_division_skips_event_lookup():
+    ev = respx.get(f"{BASE}/events/7").mock(return_value=httpx.Response(500))
+    respx.get(f"{BASE}/events/7/divisions/2/matches").mock(return_value=httpx.Response(200, json={
+        "data": [_m(21, 2, 1)], "meta": {"current_page": 1, "last_page": 1}}))
+    assert [m.re_match_id for m in _client().get_matches(7, division_id=2)] == [21]
+    assert not ev.called
+
+
+@respx.mock
+def test_pagination_follows_last_page():
+    route = respx.get(f"{BASE}/events/7/divisions/1/matches")
+    route.side_effect = [
+        httpx.Response(200, json={"data": [_m(1, 2, 1)], "meta": {"current_page": 1, "last_page": 2}}),
+        httpx.Response(200, json={"data": [_m(2, 2, 2)], "meta": {"current_page": 2, "last_page": 2}}),
+    ]
+    assert len(_client().get_matches(7, division_id=1)) == 2
+    assert [c.request.url.params["page"] for c in route.calls] == ["1", "2"]
