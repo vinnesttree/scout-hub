@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
+from app.api.auth import require_user
 from app.db import get_session
 from app.models import Event
 from app.schemas import EventImportIn, EventOut, EventSearchOut
@@ -55,7 +56,8 @@ def list_events(session: Session = Depends(get_session)) -> list[Event]:
     return session.exec(select(Event).order_by(Event.created_at.desc())).all()
 
 
-@router.get("/search", response_model=EventSearchOut)
+# Listing is public (the match library filters by event); the rest needs an account.
+@router.get("/search", response_model=EventSearchOut, dependencies=[Depends(require_user)])
 def search_event(
     q: str | None = None, sku: str | None = None, session: Session = Depends(get_session)
 ) -> EventSearchOut:
@@ -79,12 +81,12 @@ def search_event(
     )
 
 
-@router.post("/import", response_model=EventOut)
+@router.post("/import", response_model=EventOut, dependencies=[Depends(require_user)])
 def import_event(body: EventImportIn, session: Session = Depends(get_session)) -> Event:
     return _import(session, body.sku)
 
 
-@router.delete("/{event_id}", status_code=204)
+@router.delete("/{event_id}", status_code=204, dependencies=[Depends(require_user)])
 def delete_event(event_id: int, session: Session = Depends(get_session)) -> None:
     row = session.get(Event, event_id)
     if row:

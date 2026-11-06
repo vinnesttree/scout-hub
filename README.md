@@ -55,18 +55,21 @@ recording (full stream)  ──►  detect match windows (timer OCR)
    ```bash
    docker compose up -d --build
    ```
-3. Open `http://<host>:8000`.
+3. Open `http://<host>:8000` and click **Sign in**. The first time, there are no
+   accounts yet, so it offers to **create the first admin account** — do this
+   right away (or pre-seed one with `SCOUTHUB_ADMIN_USERNAME` /
+   `SCOUTHUB_ADMIN_PASSWORD` in `docker-compose.yml`).
 4. **VEX Events API key** (free, from your events.vex.com account). Either:
    - put `VEX_EVENTS_API_KEY=your-key` in a `.env` file next to
      `docker-compose.yml` (in **Dockge**: the stack's *.env* box), then redeploy —
      the compose file passes it to the app as `SCOUTHUB_VEXEVENTS_TOKEN`, and it
      **always wins** over a key typed in the web UI; or
-   - paste it in **Settings → VEX Events API**.
+   - paste it in **Admin → Settings & events → VEX Events API**.
 
    Then hit *Test connection* there; it says which key (environment or Settings
    page) it used. A key saved under the old RobotEvents setting is still used if
    nothing else is set.
-5. **Recordings → New recording**: paste the stream link (a live stream *or* an
+5. **Admin → Recordings → Add recording**: paste the stream link (a live stream *or* an
    archived YouTube/Twitch video) and, optionally, the event's **events.vex.com
    link** (or its code, e.g. `RE-V5RC-26-4058`). The event is looked up and
    imported automatically. *Start recording* — stop a live one when the stream
@@ -75,9 +78,23 @@ recording (full stream)  ──►  detect match windows (timer OCR)
      event. To pick another folder, record only part of a long past stream
      (**Section**, `HH:MM:SS-HH:MM:SS`), or change live-from-start, open
      **More options**.
-   - Events can also be imported ahead of time in **Settings → Events**.
+   - Events can also be imported ahead of time in **Admin → Settings & events → Events**.
 6. Processing runs automatically. Watch it under *Recent processing jobs*, then
    open **Match Library**.
+
+### Accounts & access
+
+| Who | Can do |
+|---|---|
+| Visitors **without an account** | Browse and search the **Match Library** (by team, event, round), open a match, watch its clip. Nothing else — every write endpoint and the admin pages return `401`. |
+| Any **signed-in account** | Everything in **Admin**: add/stop/re-process/delete recordings, import events, change settings, and edit/re-clip/delete matches. |
+| **Admin** accounts | Additionally add and remove accounts, reset passwords, and grant admin (**Admin → Accounts**). The last admin can't be removed or demoted. |
+
+Sign-ins are an HttpOnly, `SameSite=Lax` session cookie (30 days by default,
+`SCOUTHUB_SESSION_DAYS`). If you serve Scout Hub over HTTPS, set
+`SCOUTHUB_COOKIE_SECURE=true`. Passwords are stored as PBKDF2-SHA256 hashes.
+There is no login rate limiting, so don't expose the app directly to the
+internet without a reverse proxy in front of it.
 
 ### Processing time & when to trim
 
@@ -169,6 +186,8 @@ python scripts/seed_demo.py sample.mp4 --archive-subdir demo
 
 | Method & path | Purpose |
 |---|---|
+| `GET /api/auth/me` · `POST /api/auth/login` / `logout` / `setup` | session status, sign in/out, one-time first-admin setup |
+| `GET/POST /api/users` · `PATCH/DELETE /api/users/{id}` | account management (create/delete: admin only) |
 | `POST /api/recordings` | start a capture `{source_url, event?, archive_dir?, event_id?, live_from_start?, sections?}` — only `source_url` is required; `event` = events.vex.com link or event code (auto-imported); `sections` = `"HH:MM:SS-HH:MM:SS"`, archived video only |
 | `POST /api/recordings/{id}/stop` / `/process` | stop capture / re-run the pipeline |
 | `GET /api/matches?team=&event_id=&round=&sort=&order=&has_clip=` | library query |
@@ -176,5 +195,8 @@ python scripts/seed_demo.py sample.mp4 --archive-subdir demo
 | `GET /api/matches/{id}/clip` | range-request video stream |
 | `GET /api/events/search?q=` · `POST /api/events/import` | VEX Events lookup/import by events.vex.com link or event code |
 | `GET /api/health` | tool + OCR readiness |
+
+Everything except `GET /api/matches…`, `GET /api/events`, `GET /api/health` and
+`GET /api/auth/me` requires a signed-in session.
 
 Interactive docs at `/docs`.

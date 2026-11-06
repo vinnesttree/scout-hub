@@ -21,4 +21,10 @@ services:
       # When set it overrides any key entered on the Settings page; when unset
       # the Settings page key is used.
       SCOUTHUB_VEXEVENTS_TOKEN: ${VEX_EVENTS_API_KEY:-}
+      # Optional: create an admin account at startup (otherwise /login offers a
+      # one-time "create the first admin" form while no accounts exist).
+      # SCOUTHUB_ADMIN_USERNAME: "admin"
+      # SCOUTHUB_ADMIN_PASSWORD: "change-me-please"
+      # Set to "true" when serving over HTTPS.
+      # SCOUTHUB_COOKIE_SECURE: "false"
     restart: unless-stopped

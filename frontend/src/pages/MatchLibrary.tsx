@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, Match } from "../api/client";
 
@@ -37,7 +37,8 @@ export default function MatchLibrary() {
   const nav = useNavigate();
   const events = useQuery({ queryKey: ["events"], queryFn: api.listEvents });
 
-  const [team, setTeam] = useState("");
+  const [params] = useSearchParams();
+  const [team, setTeam] = useState(params.get("team") ?? "");
   const [eventId, setEventId] = useState("");
   const [round, setRound] = useState("");
   const [onlyClips, setOnlyClips] = useState(false);

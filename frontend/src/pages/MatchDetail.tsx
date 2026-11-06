@@ -1,13 +1,86 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, Match } from "../api/client";
+import { api, Match, TeamRef } from "../api/client";
+import { useAuth } from "../auth";
+
+function fmtTime(s: number | null) {
+  if (s == null) return "—";
+  const m = Math.floor(s / 60);
+  return `${m}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+}
+
+function Teams({ teams, side }: { teams: TeamRef[]; side: "red" | "blue" }) {
+  return (
+    <div className={`team-list alliance-${side}`}>
+      {teams.length ? teams.map((t) => (
+        <Link key={t.number} className="team" to={`/matches?team=${encodeURIComponent(t.number)}`}
+          title={t.name || undefined}>{t.number}</Link>
+      )) : <span className="muted">—</span>}
+    </div>
+  );
+}
+
+/** What visitors without an account see: the clip and the match facts, no editing. */
+function ReadOnlyMatch({ m, onClose }: { m: Match; onClose: () => void }) {
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="row">
+          <h1 style={{ margin: 0 }}>{m.name || `Match ${m.id}`}</h1>
+          <span className="pill">{m.round}</span>
+          <div className="spacer" />
+          <button className="sm" onClick={onClose}>Close</button>
+        </div>
+        {m.has_clip ? (
+          <video src={api.clipUrl(m.id)} controls preload="metadata" />
+        ) : (
+          <div className="panel muted">No clip for this match.</div>
+        )}
+        <div className="grid2" style={{ marginTop: 12 }}>
+          <div className="field">
+            <label>Red alliance</label>
+            <Teams teams={m.red_teams} side="red" />
+          </div>
+          <div className="field">
+            <label>Blue alliance</label>
+            <Teams teams={m.blue_teams} side="blue" />
+          </div>
+        </div>
+        <div className="row" style={{ marginTop: 12 }}>
+          <div className="field">
+            <label>Score</label>
+            <div>
+              <span className={`score red ${m.winner === "red" ? "win" : ""}`}>{m.red_score ?? "?"}</span>
+              <span className="muted"> – </span>
+              <span className={`score blue ${m.winner === "blue" ? "win" : ""}`}>{m.blue_score ?? "?"}</span>
+            </div>
+          </div>
+          {m.scheduled_at && (
+            <div className="field">
+              <label>Scheduled</label>
+              <div>{new Date(m.scheduled_at).toLocaleString()}</div>
+            </div>
+          )}
+          <div className="field">
+            <label>In recording</label>
+            <div>{fmtTime(m.video_start_s)} – {fmtTime(m.video_end_s)}</div>
+          </div>
+        </div>
+        <p className="muted" style={{ marginTop: 14, fontSize: 12 }}>
+          <Link to="/login">Sign in</Link> to correct teams, scores or clip boundaries.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 export default function MatchDetail() {
   const { id } = useParams();
   const matchId = Number(id);
   const nav = useNavigate();
   const qc = useQueryClient();
+  const { user } = useAuth();
 
   const match = useQuery({
     queryKey: ["match", matchId],
@@ -66,6 +139,7 @@ export default function MatchDetail() {
     );
 
   const m = match.data;
+  if (!user) return <ReadOnlyMatch m={m} onClose={() => nav("/matches")} />;
   const set = (patch: Partial<typeof form>) => setForm((f) => ({ ...f, ...patch }));
 
   return (

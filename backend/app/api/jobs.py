@@ -5,11 +5,12 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
+from app.api.auth import require_user
 from app.db import get_session
 from app.models import Job
 from app.schemas import JobOut
 
-router = APIRouter(prefix="/api/jobs", tags=["jobs"])
+router = APIRouter(prefix="/api/jobs", tags=["jobs"], dependencies=[Depends(require_user)])
 
 
 @router.get("", response_model=list[JobOut])
