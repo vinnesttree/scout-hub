@@ -18,7 +18,7 @@ from app.schemas import (
 )
 from app.services import settings_store
 from app.services.overlay import OverlayProfile, list_profiles, load_profile, save_profile
-from app.services.robotevents import RobotEventsClient, RobotEventsError
+from app.services.vexevents import VexEventsClient, VexEventsError
 
 router = APIRouter(prefix="/api", tags=["settings"])
 
@@ -39,20 +39,20 @@ def update_settings(body: SettingsIn, session: Session = Depends(get_session)) -
     return data
 
 
-@router.post("/settings/test-robotevents")
-def test_robotevents(session: Session = Depends(get_session)) -> dict:
-    token = settings_store.get(session, "robotevents_token")
+@router.post("/settings/test-vexevents")
+def test_vexevents(session: Session = Depends(get_session)) -> dict:
+    cfg = settings_store.get_all(session)
+    source = {"env": "environment variable", "settings": "Settings page"}.get(
+        cfg["vexevents_token_source"], ""
+    )
     try:
-        # cheap authenticated call
-        client = RobotEventsClient(token=token or None)
-        with client._client() as c:  # noqa: SLF001 - intentional internal use
-            resp = c.get("/seasons", params={"per_page": 1})
-        resp.raise_for_status()
-        return {"ok": True}
-    except RobotEventsError as exc:
-        raise HTTPException(400, str(exc))
-    except Exception as exc:  # pragma: no cover
-        raise HTTPException(400, f"RobotEvents check failed: {exc}")
+        VexEventsClient(token=cfg["vexevents_token"] or None).ping()
+        return {"ok": True, "source": cfg["vexevents_token_source"]}
+    except VexEventsError as exc:
+        detail = str(exc)
+        if source:
+            detail += f" (key from the {source}, sent to {cfg['vexevents_base_url']})"
+        raise HTTPException(400, detail)
 
 
 # --- /media folder picker -----------------------------------------

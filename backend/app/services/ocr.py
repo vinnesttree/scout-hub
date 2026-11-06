@@ -1,9 +1,9 @@
 """Best-effort OCR of team numbers + final score off the broadcast overlay.
 
-Used only when a match has no RobotEvents schedule to borrow from. Accuracy depends
+Used only when a match has no VEX Events schedule to borrow from. Accuracy depends
 heavily on the overlay layout, so results are marked ``detection_method="ocr"`` and
 are meant to be corrected in the Match Detail screen. For VEXU (alphanumeric team
-codes like ``BLRS1``) linking the RobotEvents event is strongly preferred.
+codes like ``BLRS1``) linking the VEX Events event is strongly preferred.
 """
 
 from __future__ import annotations

@@ -14,8 +14,9 @@ browse the library sorted by team.**
   broadcast **match timer** when there's a real countdown, and otherwise from the
   overlay's **match-number label** (works with static Tournament Manager overlays,
   common on VEXU / regional streams).
-- Team numbers and scores come from the **official RobotEvents API** when you link
-  an event (by SKU) — this is the reliable path for **VEXU**, whose team codes
+- Team numbers and scores come from the **official VEX Events API**
+  ([events.vex.com](https://events.vex.com), which replaced RobotEvents in 2026) when you
+  link an event — just paste its events.vex.com link. This is the reliable path for **VEXU**, whose team codes
   (`BLRS1`, `ARC`, …) are hard to OCR. Without an event link, best-effort
   **on-screen OCR** fills in what it can and you correct it.
 - **Match Library**: filter by team number, event, or round; sort by team, match
@@ -31,13 +32,13 @@ browse the library sorted by team.**
 | API + pipeline | Python 3.12, FastAPI, SQLModel/SQLite, APScheduler-style in-process worker |
 | Capture / clipping | `yt-dlp`, `ffmpeg` |
 | Match detection / OCR | OpenCV, Tesseract (`eng`) |
-| Match data | RobotEvents API v2 (`https://www.robotevents.com/api/v2`) |
+| Match data | VEX Events API v2 (`https://events.vex.com/api/v2`) |
 | Frontend | React + TypeScript + Vite, TanStack Query |
 
 ```
 recording (full stream)  ──►  detect match windows (timer OCR)
                                      │
-              linked event? ──yes──► RobotEvents schedule + align ──► teams & scores from API
+              linked event? ──yes──► VEX Events schedule + align ──► teams & scores from API
                        │
                        └──no / leftover windows ──► overlay OCR ──► teams & scores (best effort)
                                      │
@@ -55,16 +56,27 @@ recording (full stream)  ──►  detect match windows (timer OCR)
    docker compose up -d --build
    ```
 3. Open `http://<host>:8000`.
-4. **Settings → RobotEvents API**: paste a token (free, from your robotevents.com
-   account → *API*), hit *Test connection*.
-5. **Settings → Events**: import the event you're recording by its SKU
-   (e.g. `RE-VRC-24-1234`, shown on the event's robotevents.com page).
-6. **Recordings → New recording**: paste the stream URL (a live stream *or* an
-   archived YouTube/Twitch video), pick a folder under `/media`, link the event.
-   For a long past stream, set **Section** to just the block you want
-   (`HH:MM:SS-HH:MM:SS`). *Start recording* — stop a live one when the stream ends;
-   a VOD stops itself.
-7. Processing runs automatically. Watch it under *Recent processing jobs*, then
+4. **VEX Events API key** (free, from your events.vex.com account). Either:
+   - put `VEX_EVENTS_API_KEY=your-key` in a `.env` file next to
+     `docker-compose.yml` (in **Dockge**: the stack's *.env* box), then redeploy —
+     the compose file passes it to the app as `SCOUTHUB_VEXEVENTS_TOKEN`, and it
+     **always wins** over a key typed in the web UI; or
+   - paste it in **Settings → VEX Events API**.
+
+   Then hit *Test connection* there; it says which key (environment or Settings
+   page) it used. A key saved under the old RobotEvents setting is still used if
+   nothing else is set.
+5. **Recordings → New recording**: paste the stream link (a live stream *or* an
+   archived YouTube/Twitch video) and, optionally, the event's **events.vex.com
+   link** (or its code, e.g. `RE-V5RC-26-4058`). The event is looked up and
+   imported automatically. *Start recording* — stop a live one when the stream
+   ends; a VOD stops itself.
+   - Clips go to `/media/<Event name> (<code>)/`, or `/media/recordings/` with no
+     event. To pick another folder, record only part of a long past stream
+     (**Section**, `HH:MM:SS-HH:MM:SS`), or change live-from-start, open
+     **More options**.
+   - Events can also be imported ahead of time in **Settings → Events**.
+6. Processing runs automatically. Watch it under *Recent processing jobs*, then
    open **Match Library**.
 
 ### Processing time & when to trim
@@ -109,7 +121,7 @@ cd backend && pytest
 ```
 
 Unit tests cover URL classification, match-window assembly, schedule alignment,
-and RobotEvents parsing. Integration tests (skipped without `ffmpeg`) drive real
+and VEX Events parsing. Integration tests (skipped without `ffmpeg`) drive real
 frame sampling, clipping, range-request streaming, and the full OCR-only pipeline.
 
 ### Try the UI without a livestream
@@ -144,10 +156,10 @@ python scripts/seed_demo.py sample.mp4 --archive-subdir demo
   event's layout (`PUT /api/overlay-profiles/{name}`) and re-process.
 - **Alignment**: with a linked event, the k-th detected window maps to the k-th
   scheduled match (tolerating a leading offset and occasional misses). Teams and
-  scores then come straight from RobotEvents. Every match's boundaries, teams,
+  scores then come straight from VEX Events. Every match's boundaries, teams,
   and score remain editable in **Match Detail**, which re-cuts the clip on save.
 - Pure-OCR results (no event link) are marked as such and are meant to be
-  reviewed. **VEXU** in particular: link the RobotEvents event — alphanumeric
+  reviewed. **VEXU** in particular: link the VEX Events event — alphanumeric
   codes like `BLRS1` don't OCR reliably.
 - **Streams with no usable overlay at all** (e.g. a bare multi-field camera grid
   with no graphics) can't be auto-split. Link the event and add match boundaries
@@ -157,12 +169,12 @@ python scripts/seed_demo.py sample.mp4 --archive-subdir demo
 
 | Method & path | Purpose |
 |---|---|
-| `POST /api/recordings` | start a capture `{source_url, archive_dir, event_id?, live_from_start, sections?}` (`sections` = `"HH:MM:SS-HH:MM:SS"`, archived video only) |
+| `POST /api/recordings` | start a capture `{source_url, event?, archive_dir?, event_id?, live_from_start?, sections?}` — only `source_url` is required; `event` = events.vex.com link or event code (auto-imported); `sections` = `"HH:MM:SS-HH:MM:SS"`, archived video only |
 | `POST /api/recordings/{id}/stop` / `/process` | stop capture / re-run the pipeline |
 | `GET /api/matches?team=&event_id=&round=&sort=&order=&has_clip=` | library query |
 | `PATCH /api/matches/{id}` | edit boundaries / teams / score (re-clips) |
 | `GET /api/matches/{id}/clip` | range-request video stream |
-| `GET /api/events/search?sku=` · `POST /api/events/import` | RobotEvents lookup/import |
+| `GET /api/events/search?q=` · `POST /api/events/import` | VEX Events lookup/import by events.vex.com link or event code |
 | `GET /api/health` | tool + OCR readiness |
 
 Interactive docs at `/docs`.

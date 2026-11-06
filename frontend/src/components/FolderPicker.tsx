@@ -62,6 +62,8 @@ export default function FolderPicker({
           placeholder="new subfolder name"
           value={newName}
           onChange={(ev) => setNewName(ev.target.value)}
+          // don't let Enter submit a surrounding form (e.g. start a recording)
+          onKeyDown={(ev) => ev.key === "Enter" && ev.preventDefault()}
           style={{ flex: 1 }}
         />
         <button
