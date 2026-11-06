@@ -42,7 +42,7 @@ export default function Recordings() {
         <h1>Recordings</h1>
         <div className="spacer" />
         <button className="primary" onClick={() => setShowForm((v) => !v)}>
-          {showForm ? "Cancel" : "New recording"}
+          {showForm ? "Cancel" : "Add recording"}
         </button>
       </div>
 

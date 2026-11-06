@@ -54,18 +54,35 @@ recording (full stream)  ──►  detect match windows (timer OCR)
    ```bash
    docker compose up -d --build
    ```
-3. Open `http://<host>:8000`.
-4. **Settings → RobotEvents API**: paste a token (free, from your robotevents.com
+3. Open `http://<host>:8000` and click **Sign in**. The first time, there are no
+   accounts yet, so it offers to **create the first admin account** — do this
+   right away (or pre-seed one with `SCOUTHUB_ADMIN_USERNAME` /
+   `SCOUTHUB_ADMIN_PASSWORD` in `docker-compose.yml`).
+4. **Admin → Settings & events → RobotEvents API**: paste a token (free, from your robotevents.com
    account → *API*), hit *Test connection*.
-5. **Settings → Events**: import the event you're recording by its SKU
+5. **Admin → Settings & events → Events**: import the event you're recording by its SKU
    (e.g. `RE-VRC-24-1234`, shown on the event's robotevents.com page).
-6. **Recordings → New recording**: paste the stream URL (a live stream *or* an
+6. **Admin → Recordings → Add recording**: paste the stream URL (a live stream *or* an
    archived YouTube/Twitch video), pick a folder under `/media`, link the event.
    For a long past stream, set **Section** to just the block you want
    (`HH:MM:SS-HH:MM:SS`). *Start recording* — stop a live one when the stream ends;
    a VOD stops itself.
 7. Processing runs automatically. Watch it under *Recent processing jobs*, then
    open **Match Library**.
+
+### Accounts & access
+
+| Who | Can do |
+|---|---|
+| Visitors **without an account** | Browse and search the **Match Library** (by team, event, round), open a match, watch its clip. Nothing else — every write endpoint and the admin pages return `401`. |
+| Any **signed-in account** | Everything in **Admin**: add/stop/re-process/delete recordings, import events, change settings, and edit/re-clip/delete matches. |
+| **Admin** accounts | Additionally add and remove accounts, reset passwords, and grant admin (**Admin → Accounts**). The last admin can't be removed or demoted. |
+
+Sign-ins are an HttpOnly, `SameSite=Lax` session cookie (30 days by default,
+`SCOUTHUB_SESSION_DAYS`). If you serve Scout Hub over HTTPS, set
+`SCOUTHUB_COOKIE_SECURE=true`. Passwords are stored as PBKDF2-SHA256 hashes.
+There is no login rate limiting, so don't expose the app directly to the
+internet without a reverse proxy in front of it.
 
 ### Processing time & when to trim
 
@@ -157,6 +174,8 @@ python scripts/seed_demo.py sample.mp4 --archive-subdir demo
 
 | Method & path | Purpose |
 |---|---|
+| `GET /api/auth/me` · `POST /api/auth/login` / `logout` / `setup` | session status, sign in/out, one-time first-admin setup |
+| `GET/POST /api/users` · `PATCH/DELETE /api/users/{id}` | account management (create/delete: admin only) |
 | `POST /api/recordings` | start a capture `{source_url, archive_dir, event_id?, live_from_start, sections?}` (`sections` = `"HH:MM:SS-HH:MM:SS"`, archived video only) |
 | `POST /api/recordings/{id}/stop` / `/process` | stop capture / re-run the pipeline |
 | `GET /api/matches?team=&event_id=&round=&sort=&order=&has_clip=` | library query |
@@ -164,5 +183,8 @@ python scripts/seed_demo.py sample.mp4 --archive-subdir demo
 | `GET /api/matches/{id}/clip` | range-request video stream |
 | `GET /api/events/search?sku=` · `POST /api/events/import` | RobotEvents lookup/import |
 | `GET /api/health` | tool + OCR readiness |
+
+Everything except `GET /api/matches…`, `GET /api/events`, `GET /api/health` and
+`GET /api/auth/me` requires a signed-in session.
 
 Interactive docs at `/docs`.

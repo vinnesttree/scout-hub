@@ -109,3 +109,12 @@ tr.clickable { cursor: pointer; }
 
 video { width: 100%; border-radius: 8px; background: #000; }
 .thumb { width: 120px; height: 68px; object-fit: cover; border-radius: 4px; background: #000; }
+
+/* accounts / admin area */
+.topbar .signin { color: var(--accent); }
+.subnav { display: flex; gap: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+.subnav a { color: var(--muted); padding: 6px 0; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.subnav a.active { color: var(--text); border-color: var(--accent); }
+.auth-panel { max-width: 420px; margin: 40px auto; }
+a.team { color: var(--text); }
+a.team:hover { background: #283039; }

@@ -187,3 +187,39 @@ class OverlayProfileOut(BaseModel):
     red_score_region: list[float]
     blue_score_region: list[float]
     timer_invert: bool
+
+
+# --- accounts --------------------------------------------------
+
+class LoginIn(BaseModel):
+    username: str
+    password: str
+
+
+class UserOut(BaseModel):
+    id: int
+    username: str
+    is_admin: bool
+    created_at: datetime
+    last_login_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MeOut(BaseModel):
+    user: UserOut | None
+    # True while no account exists yet: /login offers "create the first admin".
+    setup_required: bool
+
+
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    is_admin: bool = False
+
+
+class UserPatch(BaseModel):
+    password: str | None = None
+    # required when changing your own password
+    current_password: str | None = None
+    is_admin: bool | None = None

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 
 from app.config import get_settings
+from app.api.auth import require_user
 from app.db import get_session
 from app.schemas import (
     DirEntry,
@@ -20,7 +21,8 @@ from app.services import settings_store
 from app.services.overlay import OverlayProfile, list_profiles, load_profile, save_profile
 from app.services.robotevents import RobotEventsClient, RobotEventsError
 
-router = APIRouter(prefix="/api", tags=["settings"])
+# Settings, the filesystem picker and overlay profiles are admin-area only.
+router = APIRouter(prefix="/api", tags=["settings"], dependencies=[Depends(require_user)])
 
 
 @router.get("/settings")

@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from sqlmodel import Session, select
 
+from app.api.auth import require_user
 from app.crud import match_team_numbers, set_match_teams
 from app.db import get_session
 from app.models import (
@@ -25,7 +26,9 @@ from app.models import (
 from app.schemas import MatchCreate, MatchOut, MatchPatch, TeamOut
 from app.services import clipper
 
+# Reading (list/search, detail, clip, thumbnail) is public; every write needs an account.
 router = APIRouter(prefix="/api/matches", tags=["matches"])
+_auth = [Depends(require_user)]
 
 _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 
@@ -140,7 +143,7 @@ def get_match(match_id: int, session: Session = Depends(get_session)) -> MatchOu
     return serialize(session, m)
 
 
-@router.post("", response_model=MatchOut, status_code=201)
+@router.post("", response_model=MatchOut, status_code=201, dependencies=_auth)
 def create_match(body: MatchCreate, session: Session = Depends(get_session)) -> MatchOut:
     rec = session.get(Recording, body.recording_id)
     if not rec:
@@ -167,7 +170,7 @@ def create_match(body: MatchCreate, session: Session = Depends(get_session)) -> 
     return serialize(session, m)
 
 
-@router.patch("/{match_id}", response_model=MatchOut)
+@router.patch("/{match_id}", response_model=MatchOut, dependencies=_auth)
 def patch_match(match_id: int, body: MatchPatch, session: Session = Depends(get_session)) -> MatchOut:
     m = session.get(Match, match_id)
     if not m:
@@ -204,7 +207,7 @@ def patch_match(match_id: int, body: MatchPatch, session: Session = Depends(get_
     return serialize(session, m)
 
 
-@router.delete("/{match_id}", status_code=204)
+@router.delete("/{match_id}", status_code=204, dependencies=_auth)
 def delete_match(
     match_id: int, delete_files: bool = False, session: Session = Depends(get_session)
 ) -> None:
@@ -221,7 +224,7 @@ def delete_match(
     session.commit()
 
 
-@router.post("/{match_id}/reclip", response_model=MatchOut)
+@router.post("/{match_id}/reclip", response_model=MatchOut, dependencies=_auth)
 def reclip_match(match_id: int, session: Session = Depends(get_session)) -> MatchOut:
     m = session.get(Match, match_id)
     if not m:

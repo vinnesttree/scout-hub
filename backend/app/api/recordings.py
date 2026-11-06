@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, func, select
 
 from app.config import get_settings
+from app.api.auth import require_user
 from app.db import get_session
 from app.models import Match, Recording, RecordingStatus
 from app.schemas import RecordingCreate, RecordingOut
@@ -17,7 +18,10 @@ from app.services import stream_resolver
 from app.services.recorder import manager as recorder_manager
 from app.worker import worker
 
-router = APIRouter(prefix="/api/recordings", tags=["recordings"])
+# Recordings are admin-area only: every endpoint needs a signed-in account.
+router = APIRouter(
+    prefix="/api/recordings", tags=["recordings"], dependencies=[Depends(require_user)]
+)
 
 
 def _to_out(session: Session, rec: Recording) -> RecordingOut:

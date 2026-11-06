@@ -192,3 +192,33 @@ class Job(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utcnow)
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
+
+
+# --- accounts ----------------------------------------------------------
+
+
+class User(SQLModel, table=True):
+    """An account. Anyone signed in can manage recordings, events, settings and
+    match edits; ``is_admin`` additionally allows managing other accounts.
+    Visitors without an account get read-only access to the match library."""
+
+    __tablename__ = "user"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    username: str = Field(index=True, unique=True)  # stored lower-cased
+    password_hash: str
+    is_admin: bool = False
+    created_at: datetime = Field(default_factory=utcnow)
+    last_login_at: Optional[datetime] = None
+
+
+class AuthSession(SQLModel, table=True):
+    """A signed-in browser session. Only a SHA-256 of the cookie token is stored."""
+
+    __tablename__ = "auth_session"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    token_hash: str = Field(index=True, unique=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    created_at: datetime = Field(default_factory=utcnow)
+    expires_at: datetime

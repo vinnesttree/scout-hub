@@ -35,7 +35,21 @@ class Settings(BaseSettings):
     keep_full_recording: bool = True
     overlay_profile: str = "vex_default"
 
+    # --- accounts / auth ------------------------------------------------
+    # Optional bootstrap admin, created at startup if no account with this
+    # username exists yet. Otherwise the first visitor to /login is offered a
+    # one-time "create the first admin" form while the user table is empty.
+    admin_username: str = ""
+    admin_password: str = ""
+    # How long a sign-in lasts.
+    session_days: float = 30.0
+    # Set true when served over HTTPS so the session cookie is Secure-only.
+    cookie_secure: bool = False
+
     # --- server --------------------------------------------------------
+    # Browser origins allowed to call the API cross-origin. With the default
+    # "*" credentials (the session cookie) are NOT allowed cross-origin; list
+    # explicit origins to allow a separately-hosted frontend to sign in.
     cors_origins: list[str] = ["*"]
     # Directory containing the built frontend (index.html + assets). Optional.
     frontend_dist: Path = Path("/app/frontend")

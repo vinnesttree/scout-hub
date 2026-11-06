@@ -1,8 +1,16 @@
 const BASE = "";
 
+/** An HTTP error from the API; `status` 401 means "not signed in". */
+export class ApiError extends Error {
+  constructor(message: string, public status: number) {
+    super(message);
+  }
+}
+
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(BASE + path, {
     headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
     ...init,
   });
   if (!res.ok) {
@@ -13,7 +21,7 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     } catch {
       /* ignore */
     }
-    throw new Error(detail);
+    throw new ApiError(detail, res.status);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -82,10 +90,30 @@ export interface Job {
   started_at: string | null; finished_at: string | null;
 }
 
+export interface User {
+  id: number; username: string; is_admin: boolean;
+  created_at: string; last_login_at: string | null;
+}
+export interface Me { user: User | null; setup_required: boolean; }
+
 // ---- endpoints ----------------------------------------------
 
 export const api = {
   health: () => req<Health>("/api/health"),
+
+  me: () => req<Me>("/api/auth/me"),
+  login: (username: string, password: string) =>
+    req<Me>("/api/auth/login", { method: "POST", body: JSON.stringify({ username, password }) }),
+  setup: (username: string, password: string) =>
+    req<Me>("/api/auth/setup", { method: "POST", body: JSON.stringify({ username, password }) }),
+  logout: () => req<void>("/api/auth/logout", { method: "POST" }),
+
+  listUsers: () => req<User[]>("/api/users"),
+  createUser: (body: { username: string; password: string; is_admin: boolean }) =>
+    req<User>("/api/users", { method: "POST", body: JSON.stringify(body) }),
+  updateUser: (id: number, body: { password?: string; current_password?: string; is_admin?: boolean }) =>
+    req<User>(`/api/users/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  deleteUser: (id: number) => req<void>(`/api/users/${id}`, { method: "DELETE" }),
 
   getSettings: () => req<AppSettings>("/api/settings"),
   putSettings: (body: Partial<AppSettings>) =>

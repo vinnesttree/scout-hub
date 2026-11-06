@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from app import __version__
 from app.config import get_settings
 from app.db import init_db
-from app.api import events, jobs, matches, recordings, settings
+from app.api import auth, events, jobs, matches, recordings, settings
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,6 +27,14 @@ log = logging.getLogger("scouthub")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    from app.db import session_scope
+    from app.services import auth as auth_svc
+
+    with session_scope() as s:
+        auth_svc.ensure_bootstrap_admin(s)
+        if auth_svc.user_count(s) == 0:
+            log.warning("no accounts yet: open /login to create the first admin")
+
     from app.services.recorder import recover_orphans
     from app.worker import wire_and_start
 
@@ -52,11 +60,14 @@ _cfg = get_settings()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cfg.cors_origins,
-    allow_credentials=True,
+    # Never combine a wildcard origin with credentials: that would let any site
+    # make signed-in requests with a visitor's session cookie.
+    allow_credentials="*" not in _cfg.cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(settings.router)
 app.include_router(events.router)
 app.include_router(recordings.router)

@@ -77,7 +77,10 @@ def test_detect_clip_and_stream(tmp_path, monkeypatch):
         s.flush()
         rec_id = rec.id
 
+    from conftest import sign_in
+
     with TestClient(app) as client:
+        sign_in(client)
         created = client.post("/api/matches", json={
             "recording_id": rec_id, "name": "Qual 1", "round": "qual", "match_num": 1,
             "video_start_s": w.start_s, "video_end_s": w.end_s,
