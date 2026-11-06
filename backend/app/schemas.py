@@ -12,7 +12,7 @@ from app.models import MatchRound
 # --- settings ---------------------------------------------------------
 
 class SettingsIn(BaseModel):
-    robotevents_token: str | None = None
+    vexevents_token: str | None = None
     clip_pad_start_s: float | None = None
     clip_pad_end_s: float | None = None
     sample_fps: float | None = None
@@ -64,15 +64,19 @@ class EventSearchOut(BaseModel):
 
 
 class EventImportIn(BaseModel):
-    sku: str
+    sku: str  # event code, or an events.vex.com event link
 
 
 # --- recordings ----------------------------------------------------
 
 class RecordingCreate(BaseModel):
     source_url: str
-    archive_dir: str
+    # Optional: defaults to a folder named after the linked event (or "recordings").
+    archive_dir: str | None = None
     event_id: int | None = None
+    # Alternative to event_id: an events.vex.com event link or event code. The
+    # event is imported from VEX Events if it isn't in the local DB yet.
+    event: str | None = None
     live_from_start: bool = True
     # VOD only: download just this span, e.g. "0-600" or "1:03:00-1:21:30"
     sections: str | None = None

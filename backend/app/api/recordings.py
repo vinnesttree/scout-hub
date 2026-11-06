@@ -12,7 +12,8 @@ from sqlmodel import Session, func, select
 from app.config import get_settings
 from app.api.auth import require_user
 from app.db import get_session
-from app.models import Match, Recording, RecordingStatus
+from app.models import Event, Match, Recording, RecordingStatus
+from app.api.events import get_or_import_event
 from app.schemas import RecordingCreate, RecordingOut
 from app.services import stream_resolver
 from app.services.recorder import manager as recorder_manager
@@ -22,6 +23,16 @@ from app.worker import worker
 router = APIRouter(
     prefix="/api/recordings", tags=["recordings"], dependencies=[Depends(require_user)]
 )
+
+
+def default_archive_dir(event: Event | None) -> str:
+    """Folder (relative to the archive root) used when none is chosen:
+    ``<Event name> (<SKU>)`` for a linked event, else ``recordings``."""
+    if event is None:
+        return "recordings"
+    name = re.sub(r"[^\w\- .()&]+", " ", event.name or "").strip()
+    name = re.sub(r"\s+", " ", name).strip(" .")[:80]
+    return f"{name} ({event.sku})" if name else event.sku
 
 
 def _to_out(session: Session, rec: Recording) -> RecordingOut:
@@ -55,8 +66,22 @@ def create_recording(body: RecordingCreate, session: Session = Depends(get_sessi
     except stream_resolver.ResolveError as exc:
         raise HTTPException(400, str(exc))
 
+    event_id = body.event_id
+    event: Event | None = None
+    if (body.event or "").strip():
+        event = get_or_import_event(session, body.event.strip())
+        event_id = event.id
+    elif event_id is not None:
+        event = session.get(Event, event_id)
+        if event is None:
+            raise HTTPException(400, f"event #{event_id} not found")
+
+    sections = (body.sections or "").strip() or None
+    if sections and not re.match(r"^(\d+:)?(\d+:)?\d+(\.\d+)?-(\d+:)?(\d+:)?\d+(\.\d+)?$", sections):
+        raise HTTPException(400, "sections must look like '0-600' or '1:03:00-1:21:30'")
+
     root = get_settings().archive_root.resolve()
-    archive_dir = Path(body.archive_dir)
+    archive_dir = Path((body.archive_dir or "").strip() or default_archive_dir(event))
     if not archive_dir.is_absolute():
         archive_dir = root / archive_dir
     archive_dir = archive_dir.resolve()
@@ -64,16 +89,12 @@ def create_recording(body: RecordingCreate, session: Session = Depends(get_sessi
         raise HTTPException(400, "archive_dir must be inside the archive root")
     archive_dir.mkdir(parents=True, exist_ok=True)
 
-    sections = (body.sections or "").strip() or None
-    if sections and not re.match(r"^(\d+:)?(\d+:)?\d+(\.\d+)?-(\d+:)?(\d+:)?\d+(\.\d+)?$", sections):
-        raise HTTPException(400, "sections must look like '0-600' or '1:03:00-1:21:30'")
-
     rec = Recording(
         source_url=body.source_url,
         source_type=resolved.source_type,
         resolved_url=resolved.url,
         archive_dir=str(archive_dir),
-        event_id=body.event_id,
+        event_id=event_id,
         live_from_start=body.live_from_start,
         sections=sections,
         status=RecordingStatus.pending,

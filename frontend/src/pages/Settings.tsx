@@ -22,7 +22,7 @@ export default function Settings() {
         keep_full_recording: form.keep_full_recording,
         overlay_profile: form.overlay_profile,
       };
-      if (token.trim()) (body as Record<string, unknown>).robotevents_token = token.trim();
+      if (token.trim()) (body as Record<string, unknown>).vexevents_token = token.trim();
       return api.putSettings(body);
     },
     onSuccess: () => {
@@ -31,7 +31,7 @@ export default function Settings() {
     },
   });
 
-  const testRE = useMutation({ mutationFn: api.testRobotEvents });
+  const testVE = useMutation({ mutationFn: api.testVexEvents });
 
   const [sku, setSku] = useState("");
   const [found, setFound] = useState<EventSearchOut | null>(null);
@@ -60,21 +60,34 @@ export default function Settings() {
       <h1>Settings</h1>
 
       <div className="panel">
-        <h2>RobotEvents API</h2>
+        <h2>VEX Events API</h2>
         <p className="muted">
-          Free token from your robotevents.com account (Account → API). Enables authoritative
-          team lists and final scores.
+          Free API token from your <a href="https://events.vex.com" target="_blank" rel="noreferrer">events.vex.com</a> account.
+          Enables authoritative team lists and final scores.
         </p>
         <div className="row">
-          <div className="field" style={{ flex: 1 }}>
-            <label>API token {s?.robotevents_token_set && <span className="badge ok">stored</span>}</label>
-            <input type="password" value={token} placeholder={s?.robotevents_token_set ? "•••••••• (leave blank to keep)" : "paste token"}
-              onChange={(e) => setToken(e.target.value)} />
-          </div>
-          <button onClick={() => testRE.mutate()} disabled={testRE.isPending}>Test connection</button>
+          {s?.vexevents_token_source === "env" ? (
+            <div className="field" style={{ flex: 1 }}>
+              <label>API key <span className="badge ok">from environment</span></label>
+              <div className="muted" style={{ fontSize: 13 }}>
+                Using the key from the <code>SCOUTHUB_VEXEVENTS_TOKEN</code> /{" "}
+                <code>VEX_EVENTS_API_KEY</code> environment variable. Unset it to manage the key here.
+              </div>
+            </div>
+          ) : (
+            <div className="field" style={{ flex: 1 }}>
+              <label>API key {s?.vexevents_token_set && <span className="badge ok">stored</span>}</label>
+              <input type="password" value={token} placeholder={s?.vexevents_token_set ? "•••••••• (leave blank to keep)" : "paste key"}
+                onChange={(e) => setToken(e.target.value)} />
+              <div className="muted" style={{ fontSize: 12 }}>
+                Or set <code>SCOUTHUB_VEXEVENTS_TOKEN</code> in the environment (docker-compose.yml) — it overrides this.
+              </div>
+            </div>
+          )}
+          <button onClick={() => testVE.mutate()} disabled={testVE.isPending}>Test connection</button>
         </div>
-        {testRE.isSuccess && <p className="badge ok">RobotEvents reachable ✓</p>}
-        {testRE.error && <p className="error">{String((testRE.error as Error).message)}</p>}
+        {testVE.isSuccess && <p className="badge ok">VEX Events reachable ✓</p>}
+        {testVE.error && <p className="error">{String((testVE.error as Error).message)}</p>}
       </div>
 
       <div className="panel">
@@ -118,8 +131,9 @@ export default function Settings() {
         <h2>Events</h2>
         <div className="row">
           <div className="field" style={{ flex: 1 }}>
-            <label>Import by SKU (e.g. RE-VRC-24-1234)</label>
-            <input value={sku} onChange={(e) => setSku(e.target.value)} />
+            <label>Import by events.vex.com link or event code (e.g. RE-V5RC-26-4058)</label>
+            <input value={sku} onChange={(e) => setSku(e.target.value)}
+              placeholder="https://events.vex.com/…/RE-V5RC-26-4058.html" />
           </div>
           <button onClick={() => search.mutate()} disabled={!sku.trim() || search.isPending}>Look up</button>
         </div>
@@ -133,7 +147,7 @@ export default function Settings() {
           </div>
         )}
         <table style={{ marginTop: 12 }}>
-          <thead><tr><th className="no-sort">Name</th><th className="no-sort">SKU</th>
+          <thead><tr><th className="no-sort">Name</th><th className="no-sort">Event code</th>
             <th className="no-sort">Program</th><th className="no-sort"></th></tr></thead>
           <tbody>
             {events.data?.map((e) => (

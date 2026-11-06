@@ -1,6 +1,6 @@
 from app.services.aligner import align
 from app.services.match_detect import MatchWindow
-from app.services.robotevents import REAlliance, REMatch, RETeamRef
+from app.services.vexevents import REAlliance, REMatch, RETeamRef
 
 
 def _match(i):

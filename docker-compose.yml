@@ -16,8 +16,11 @@ services:
     environment:
       SCOUTHUB_ARCHIVE_ROOT: /media
       SCOUTHUB_DATA_DIR: /data
-      # Optional: seed the RobotEvents token here instead of the Settings page.
-      # SCOUTHUB_ROBOTEVENTS_TOKEN: "your-token"
+      # VEX Events API key, read from the .env file next to this compose file
+      # (in Dockge: the stack's ".env" box) as:  VEX_EVENTS_API_KEY=your-key
+      # When set it overrides any key entered on the Settings page; when unset
+      # the Settings page key is used.
+      SCOUTHUB_VEXEVENTS_TOKEN: ${VEX_EVENTS_API_KEY:-}
       # Optional: create an admin account at startup (otherwise /login offers a
       # one-time "create the first admin" form while no accounts exist).
       # SCOUTHUB_ADMIN_USERNAME: "admin"

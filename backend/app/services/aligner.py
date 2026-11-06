@@ -1,4 +1,4 @@
-"""Map detected video windows onto a RobotEvents match schedule.
+"""Map detected video windows onto a VEX Events match schedule.
 
 The schedule is authoritative for *which* matches exist, their teams and their
 scores. Detection gives us where each match sits in the recording. Both lists are
@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.services.match_detect import MatchWindow
-from app.services.robotevents import REMatch
+from app.services.vexevents import REMatch
 
 
 @dataclass

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Populate the database from a local video + (optionally) a RobotEvents event,
+"""Populate the database from a local video + (optionally) a VEX Events event,
 so the UI can be explored without capturing a live stream.
 
-    python scripts/seed_demo.py /path/to/recording.mp4 --archive-subdir demo [--sku RE-VRC-24-1234]
+    python scripts/seed_demo.py /path/to/recording.mp4 --archive-subdir demo [--sku RE-V5RC-26-4058]
 
 Run it with the same env as the app (SCOUTHUB_ARCHIVE_ROOT etc). The video is
 copied into <archive_root>/<archive-subdir>/full/ and processed by the normal
@@ -22,14 +22,14 @@ from app.config import get_settings  # noqa: E402
 from app.db import init_db, session_scope  # noqa: E402
 from app.models import Event, Recording, RecordingStatus, SourceType  # noqa: E402
 from app.services import jobs  # noqa: E402
-from app.services.robotevents import RobotEventsClient, RobotEventsError  # noqa: E402
+from app.services.vexevents import VexEventsClient, VexEventsError  # noqa: E402
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("video", type=Path)
     ap.add_argument("--archive-subdir", default="demo")
-    ap.add_argument("--sku", default=None, help="RobotEvents SKU to link (needs a token)")
+    ap.add_argument("--sku", default=None, help="VEX Events event code or events.vex.com link (needs a token)")
     args = ap.parse_args()
 
     if not args.video.exists():
@@ -47,8 +47,8 @@ def main() -> None:
     event_id = None
     if args.sku:
         try:
-            ev = RobotEventsClient().find_event(args.sku)
-        except RobotEventsError as exc:
+            ev = VexEventsClient().find_event(args.sku)
+        except VexEventsError as exc:
             print(f"! could not load event: {exc}")
         else:
             with session_scope() as s:
