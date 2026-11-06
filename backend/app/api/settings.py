@@ -18,7 +18,7 @@ from app.schemas import (
 )
 from app.services import settings_store
 from app.services.overlay import OverlayProfile, list_profiles, load_profile, save_profile
-from app.services.robotevents import RobotEventsClient, RobotEventsError
+from app.services.vexevents import VexEventsClient, VexEventsError
 
 router = APIRouter(prefix="/api", tags=["settings"])
 
@@ -39,20 +39,14 @@ def update_settings(body: SettingsIn, session: Session = Depends(get_session)) -
     return data
 
 
-@router.post("/settings/test-robotevents")
-def test_robotevents(session: Session = Depends(get_session)) -> dict:
-    token = settings_store.get(session, "robotevents_token")
+@router.post("/settings/test-vexevents")
+def test_vexevents(session: Session = Depends(get_session)) -> dict:
+    token = settings_store.get(session, "vexevents_token")
     try:
-        # cheap authenticated call
-        client = RobotEventsClient(token=token or None)
-        with client._client() as c:  # noqa: SLF001 - intentional internal use
-            resp = c.get("/seasons", params={"per_page": 1})
-        resp.raise_for_status()
+        VexEventsClient(token=token or None).ping()
         return {"ok": True}
-    except RobotEventsError as exc:
+    except VexEventsError as exc:
         raise HTTPException(400, str(exc))
-    except Exception as exc:  # pragma: no cover
-        raise HTTPException(400, f"RobotEvents check failed: {exc}")
 
 
 # --- /media folder picker -----------------------------------------

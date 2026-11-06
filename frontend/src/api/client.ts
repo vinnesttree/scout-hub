@@ -29,8 +29,8 @@ export interface Health {
 }
 
 export interface AppSettings {
-  robotevents_token: string;
-  robotevents_token_set: boolean;
+  vexevents_token: string;
+  vexevents_token_set: boolean;
   clip_pad_start_s: number;
   clip_pad_end_s: number;
   sample_fps: number;
@@ -90,8 +90,8 @@ export const api = {
   getSettings: () => req<AppSettings>("/api/settings"),
   putSettings: (body: Partial<AppSettings>) =>
     req<AppSettings>("/api/settings", { method: "PUT", body: JSON.stringify(body) }),
-  testRobotEvents: () =>
-    req<{ ok: boolean }>("/api/settings/test-robotevents", { method: "POST" }),
+  testVexEvents: () =>
+    req<{ ok: boolean }>("/api/settings/test-vexevents", { method: "POST" }),
 
   listDirs: (path?: string) =>
     req<DirListing>("/api/fs/dirs" + (path ? `?path=${encodeURIComponent(path)}` : "")),
@@ -99,16 +99,19 @@ export const api = {
     req<DirListing>("/api/fs/dirs", { method: "POST", body: JSON.stringify({ path, name }) }),
 
   listEvents: () => req<EventOut[]>("/api/events"),
-  searchEvent: (sku: string) =>
-    req<EventSearchOut>(`/api/events/search?sku=${encodeURIComponent(sku)}`),
+  /** `q` = an events.vex.com event link or an event code (RE-V5RC-26-4058). */
+  searchEvent: (q: string) =>
+    req<EventSearchOut>(`/api/events/search?q=${encodeURIComponent(q)}`),
   importEvent: (sku: string) =>
     req<EventOut>("/api/events/import", { method: "POST", body: JSON.stringify({ sku }) }),
   deleteEvent: (id: number) => req<void>(`/api/events/${id}`, { method: "DELETE" }),
 
   listRecordings: () => req<Recording[]>("/api/recordings"),
   createRecording: (body: {
-    source_url: string; archive_dir: string; event_id?: number | null;
-    live_from_start: boolean; sections?: string | null;
+    source_url: string; archive_dir?: string | null; event_id?: number | null;
+    /** events.vex.com event link or event code; imported automatically. */
+    event?: string | null;
+    live_from_start?: boolean; sections?: string | null;
   }) => req<Recording>("/api/recordings", { method: "POST", body: JSON.stringify(body) }),
   stopRecording: (id: number) =>
     req<Recording>(`/api/recordings/${id}/stop`, { method: "POST" }),

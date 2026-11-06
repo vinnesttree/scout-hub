@@ -1,11 +1,14 @@
-"""Thin client for the RobotEvents API v2 (https://www.robotevents.com/api/v2).
+"""Thin client for the VEX Events API v2 (https://events.vex.com/api/v2).
 
-Auth is a personal bearer token from a robotevents.com account (Account -> API).
+VEX Events replaced RobotEvents in 2026; the v2 API kept the same endpoints and
+response shapes, only the host changed. Auth is a personal bearer token from an
+events.vex.com account.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import re
 from datetime import datetime
 
 import httpx
@@ -25,8 +28,23 @@ _ROUND_MAP = {
 }
 
 
-class RobotEventsError(RuntimeError):
+class VexEventsError(RuntimeError):
     pass
+
+
+# Event codes ("SKUs") look like RE-V5RC-26-4058, RE-VURC-25-1234, RE-VRC-24-1234.
+_SKU_RE = re.compile(r"\b(RE-[A-Z0-9]+-\d{2}-\d+)\b", re.IGNORECASE)
+
+
+def extract_sku(text: str) -> str | None:
+    """Pull an event code out of a bare code or an event page link.
+
+    Accepts e.g. ``RE-V5RC-26-4058``,
+    ``https://events.vex.com/robot-competitions/vex-robotics-competition/RE-V5RC-26-4058.html``
+    (any language prefix), or an old robotevents.com link.
+    """
+    m = _SKU_RE.search(text or "")
+    return m.group(1).upper() if m else None
 
 
 @dataclass
@@ -79,15 +97,37 @@ def _parse_dt(value: str | None) -> datetime | None:
         return None
 
 
-class RobotEventsClient:
+def _get(client: httpx.Client, path: str, params: dict) -> httpx.Response:
+    try:
+        return client.get(path, params=params)
+    except httpx.HTTPError as exc:
+        raise VexEventsError(f"Couldn't reach VEX Events ({client.base_url}): {exc}") from exc
+
+
+def _check(resp: httpx.Response) -> None:
+    if resp.status_code == 401:
+        raise VexEventsError("VEX Events rejected the API token (401).")
+    if resp.status_code == 403:
+        # VEX Events answers some rate-limited requests with 403 instead of 429.
+        raise VexEventsError(
+            "VEX Events refused the request (403): the token may be invalid, or the rate "
+            "limit was hit. Check the token and try again shortly."
+        )
+    if resp.status_code == 429:
+        raise VexEventsError("VEX Events rate limit hit (429). Try again shortly.")
+    if resp.is_error:
+        raise VexEventsError(f"VEX Events returned HTTP {resp.status_code}.")
+
+
+class VexEventsClient:
     def __init__(self, token: str | None = None, base_url: str | None = None) -> None:
         cfg = get_settings()
-        self.token = (token or cfg.robotevents_token or "").strip()
-        self.base_url = (base_url or cfg.robotevents_base_url).rstrip("/")
+        self.token = (token or cfg.vexevents_token or "").strip()
+        self.base_url = (base_url or cfg.vexevents_base_url).rstrip("/")
 
     def _client(self) -> httpx.Client:
         if not self.token:
-            raise RobotEventsError("No RobotEvents API token configured (Settings page).")
+            raise VexEventsError("No VEX Events API token configured (Settings page).")
         return httpx.Client(
             base_url=self.base_url,
             headers={
@@ -98,17 +138,13 @@ class RobotEventsClient:
         )
 
     def _get_all(self, client: httpx.Client, path: str, params: dict) -> list[dict]:
-        """Follow RobotEvents' page-based pagination."""
+        """Follow the API's page-based pagination."""
         results: list[dict] = []
         page = 1
         while True:
             q = {**params, "page": page, "per_page": 250}
-            resp = client.get(path, params=q)
-            if resp.status_code == 401:
-                raise RobotEventsError("RobotEvents rejected the API token (401).")
-            if resp.status_code == 429:
-                raise RobotEventsError("RobotEvents rate limit hit (429). Try again shortly.")
-            resp.raise_for_status()
+            resp = _get(client, path, q)
+            _check(resp)
             body = resp.json()
             results.extend(body.get("data", []))
             meta = body.get("meta", {})
@@ -119,12 +155,23 @@ class RobotEventsClient:
 
     # -- public API --------------------------------------------------
 
-    def find_event(self, sku: str) -> REEvent:
-        sku = sku.strip()
+    def ping(self) -> None:
+        """Cheap authenticated call, used by Settings -> Test connection."""
+        with self._client() as client:
+            _check(_get(client, "/seasons", {"per_page": 1}))
+
+    def find_event(self, sku_or_link: str) -> REEvent:
+        """Look an event up by its code or by an events.vex.com event link."""
+        sku = extract_sku(sku_or_link)
+        if not sku:
+            raise VexEventsError(
+                "Couldn't find an event code in that. Paste the event's events.vex.com link "
+                "or its code, e.g. RE-V5RC-26-4058."
+            )
         with self._client() as client:
             rows = self._get_all(client, "/events", {"sku[]": sku})
         if not rows:
-            raise RobotEventsError(f"No event found for SKU {sku!r}.")
+            raise VexEventsError(f"No event found on VEX Events for {sku}.")
         e = rows[0]
         return REEvent(
             re_event_id=e["id"],

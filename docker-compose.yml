@@ -16,6 +16,6 @@ services:
     environment:
       SCOUTHUB_ARCHIVE_ROOT: /media
       SCOUTHUB_DATA_DIR: /data
-      # Optional: seed the RobotEvents token here instead of the Settings page.
-      # SCOUTHUB_ROBOTEVENTS_TOKEN: "your-token"
+      # Optional: seed the VEX Events API token here instead of the Settings page.
+      # SCOUTHUB_VEXEVENTS_TOKEN: "your-token"
     restart: unless-stopped

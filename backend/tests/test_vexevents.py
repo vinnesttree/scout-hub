@@ -1,13 +1,15 @@
 import httpx
 import respx
 
-from app.services.robotevents import RobotEventsClient
+import pytest
 
-BASE = "https://re.test/api/v2"
+from app.services.vexevents import VexEventsClient, VexEventsError, extract_sku
+
+BASE = "https://ve.test/api/v2"
 
 
 def _client():
-    return RobotEventsClient(token="tok", base_url=BASE)
+    return VexEventsClient(token="tok", base_url=BASE)
 
 
 @respx.mock
@@ -88,3 +90,63 @@ def test_get_matches_extracts_alliances_and_scores():
     assert q2.alliance("red").score == 88
     assert [t.number for t in q2.alliance("red").teams] == ["1234A", "5678B"]
     assert q2.round == "qual"
+
+
+def test_default_base_url_is_vex_events():
+    assert VexEventsClient(token="t").base_url == "https://events.vex.com/api/v2"
+
+
+@pytest.mark.parametrize(
+    "text, sku",
+    [
+        ("RE-V5RC-26-4058", "RE-V5RC-26-4058"),
+        ("  re-v5rc-26-4058 ", "RE-V5RC-26-4058"),
+        ("https://events.vex.com/robot-competitions/vex-robotics-competition/RE-V5RC-26-4058.html",
+         "RE-V5RC-26-4058"),
+        ("https://events.vex.com/de/RE-V5RC-26-4646.html", "RE-V5RC-26-4646"),
+        ("https://events.vex.com/robot-competitions/college-competition/RE-VURC-25-1234.html#tab-results",
+         "RE-VURC-25-1234"),
+        ("https://www.robotevents.com/robot-competitions/vex-robotics-competition/RE-VRC-24-1234.html",
+         "RE-VRC-24-1234"),
+        ("State Championship", None),
+        ("", None),
+    ],
+)
+def test_extract_sku(text, sku):
+    assert extract_sku(text) == sku
+
+
+@respx.mock
+def test_find_event_accepts_event_link():
+    route = respx.get(f"{BASE}/events").mock(
+        return_value=httpx.Response(
+            200,
+            json={"data": [{"id": 7, "sku": "RE-V5RC-26-4058", "name": "Yixing"}],
+                  "meta": {"current_page": 1, "last_page": 1}},
+        )
+    )
+    ev = _client().find_event(
+        "https://events.vex.com/robot-competitions/vex-robotics-competition/RE-V5RC-26-4058.html"
+    )
+    assert ev.re_event_id == 7
+    assert route.calls.last.request.url.params["sku[]"] == "RE-V5RC-26-4058"
+
+
+def test_find_event_rejects_text_without_code():
+    with pytest.raises(VexEventsError, match="event code"):
+        _client().find_event("some event name")
+
+
+@pytest.mark.parametrize("status, needle", [(401, "401"), (403, "403"), (429, "429"), (500, "500")])
+@respx.mock
+def test_http_errors_become_vexevents_errors(status, needle):
+    respx.get(f"{BASE}/events").mock(return_value=httpx.Response(status))
+    with pytest.raises(VexEventsError, match=needle):
+        _client().find_event("RE-V5RC-26-4058")
+
+
+@respx.mock
+def test_network_failure_becomes_vexevents_error():
+    respx.get(f"{BASE}/events").mock(side_effect=httpx.ConnectError("boom"))
+    with pytest.raises(VexEventsError, match="reach VEX Events"):
+        _client().find_event("RE-V5RC-26-4058")

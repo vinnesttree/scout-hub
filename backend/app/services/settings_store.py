@@ -25,13 +25,17 @@ class Knob:
 
 # Keys exposed on the Settings page. `cast` is used both ways (store/read).
 KNOBS: dict[str, Knob] = {
-    "robotevents_token": Knob("robotevents_token", str, "RobotEvents API token", secret=True),
+    "vexevents_token": Knob("vexevents_token", str, "VEX Events API token", secret=True),
     "clip_pad_start_s": Knob("clip_pad_start_s", float, "Clip padding before match (s)"),
     "clip_pad_end_s": Knob("clip_pad_end_s", float, "Clip padding after match (s)"),
     "sample_fps": Knob("sample_fps", float, "Detection sample rate (fps)"),
     "keep_full_recording": Knob("keep_full_recording", bool, "Keep full recording after clipping"),
     "overlay_profile": Knob("overlay_profile", str, "Broadcast overlay profile"),
 }
+
+
+# Renamed settings: old DB key -> new key.
+_LEGACY_KEYS = {"robotevents_token": "vexevents_token"}
 
 
 def _parse(raw: str, cast: type) -> Any:
@@ -54,14 +58,21 @@ def get_all(session: Session) -> dict[str, Any]:
     cfg = get_settings()
     overrides = {row.key: row.value for row in session.exec(select(AppSetting)).all()}
     out: dict[str, Any] = {}
+    # A token saved before the move to VEX Events (same token format, same API)
+    # keeps working until a new one is entered.
+    for old, new in _LEGACY_KEYS.items():
+        if overrides.get(old) and not overrides.get(new):
+            overrides[new] = overrides[old]
     for key, knob in KNOBS.items():
         if key in overrides and overrides[key] != "":
             out[key] = _parse(overrides[key], knob.cast)
         else:
             out[key] = getattr(cfg, key)
+    if not out["vexevents_token"] and cfg.robotevents_token:
+        out["vexevents_token"] = cfg.robotevents_token
     # Non-editable but useful for the UI.
     out["archive_root"] = str(cfg.archive_root)
-    out["robotevents_base_url"] = cfg.robotevents_base_url
+    out["vexevents_base_url"] = cfg.vexevents_base_url
     return out
 
 

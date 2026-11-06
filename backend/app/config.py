@@ -1,6 +1,6 @@
 """Deployment configuration (env-driven, not user-editable at runtime).
 
-Runtime-editable knobs (RobotEvents token, clip padding, sample fps, ...) live in the
+Runtime-editable knobs (VEX Events token, clip padding, sample fps, ...) live in the
 database via :mod:`app.services.settings_store` and fall back to the values here.
 """
 
@@ -25,8 +25,10 @@ class Settings(BaseSettings):
     data_dir: Path = Path("/data")
 
     # --- external services (defaults; overridable in the Settings page) --
+    vexevents_token: str = ""
+    vexevents_base_url: str = "https://events.vex.com/api/v2"
+    # Legacy name (pre-VEX Events); used only if SCOUTHUB_VEXEVENTS_TOKEN is unset.
     robotevents_token: str = ""
-    robotevents_base_url: str = "https://www.robotevents.com/api/v2"
 
     # --- processing defaults (overridable in the Settings page) ---------
     clip_pad_start_s: float = 8.0

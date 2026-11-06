@@ -26,7 +26,7 @@ from app.models import (
 from app.services import clipper, match_detect, ocr
 from app.services.aligner import align
 from app.services.overlay import load_profile
-from app.services.robotevents import RobotEventsClient, RobotEventsError
+from app.services.vexevents import VexEventsClient, VexEventsError
 from app.services import settings_store
 
 log = logging.getLogger("scouthub.jobs")
@@ -138,9 +138,9 @@ def _catalog_with_schedule(
         with session_scope() as session:
             ev = session.get(Event, event_id)
             re_event_id = ev.re_event_id if ev else None
-        client = RobotEventsClient(token=cfg["robotevents_token"] or None)
+        client = VexEventsClient(token=cfg["vexevents_token"] or None)
         schedule = client.get_matches(re_event_id) if re_event_id else []
-    except RobotEventsError as exc:
+    except VexEventsError as exc:
         log.warning("schedule fetch failed (%s); falling back to OCR", exc)
         return _catalog_ocr_only(recording_id, video, archive_dir, windows, profile, cfg, workdir)
 
