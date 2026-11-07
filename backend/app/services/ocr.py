@@ -122,12 +122,24 @@ def _vote_score(samples: list[str]) -> int | None:
 
 
 def read_overlay(
-    video: Path,
+    video: Path | None,
     start_s: float,
     end_s: float,
     profile,
     workdir: Path,
+    *,
+    grab=None,
 ) -> OverlayRead:
+    """OCR teams + score around a match window.
+
+    ``grab(t, dest) -> Path | None`` extracts one frame at recording time ``t``;
+    it defaults to seeking in ``video``. The live splitter passes one that reads
+    from the capture's finished segments instead.
+    """
+    if grab is None:
+        def grab(t: float, dest: Path) -> Path | None:
+            return _grab_frame(video, t, dest)
+
     try:
         import cv2  # noqa: PLC0415
     except Exception:  # pragma: no cover
@@ -143,7 +155,7 @@ def read_overlay(
     red_score_texts, blue_score_texts = [], []
 
     for i, t in enumerate(team_ts):
-        f = _grab_frame(video, t, workdir / f"team_{i}.jpg")
+        f = grab(t, workdir / f"team_{i}.jpg")
         if not f:
             continue
         img = cv2.imread(str(f))
@@ -155,7 +167,7 @@ def read_overlay(
     for i, t in enumerate(score_ts):
         if t < start_s:
             continue
-        f = _grab_frame(video, t, workdir / f"score_{i}.jpg")
+        f = grab(t, workdir / f"score_{i}.jpg")
         if not f:
             continue
         img = cv2.imread(str(f))

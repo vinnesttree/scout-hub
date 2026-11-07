@@ -26,6 +26,9 @@ class SourceType(str, enum.Enum):
 class RecordingStatus(str, enum.Enum):
     pending = "pending"
     recording = "recording"
+    # capture has ended; the live splitter is finishing the last matches and the
+    # segments are being joined into the full recording
+    finalizing = "finalizing"
     completed = "completed"
     failed = "failed"
     interrupted = "interrupted"
@@ -112,6 +115,15 @@ class Recording(SQLModel, table=True):
     progress: str = ""              # last human-readable progress line
     error: Optional[str] = None
     pid: Optional[int] = None
+    # Wall-clock time of t=0 in the recording, when known (live capture start, or
+    # the broadcast start reported by the platform). Used to tie detected matches
+    # to VEX Events' actual match start times.
+    video_started_at: Optional[datetime] = None
+    # Live match splitting (runs while the stream is still being captured):
+    # "" (not used) | "running" | "done" | "failed"
+    split_status: str = ""
+    split_detail: str = ""
+    analyzed_s: Optional[float] = None   # how far into the recording the splitter has got
     created_at: datetime = Field(default_factory=utcnow)
 
     event_id: Optional[int] = Field(default=None, foreign_key="event.id", index=True)
@@ -157,6 +169,9 @@ class Match(SQLModel, table=True):
     detection_method: DetectionMethod = DetectionMethod.manual
     status: MatchStatus = MatchStatus.detected
     review_note: str = ""
+    # True while teams/score are rough on-screen OCR estimates waiting to be
+    # replaced by VEX Events data (only set when the recording has a linked event).
+    provisional: bool = False
     created_at: datetime = Field(default_factory=utcnow)
 
     recording: Optional[Recording] = Relationship(back_populates="matches")

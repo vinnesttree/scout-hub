@@ -36,10 +36,16 @@ class JobWorker:
     def submit(self, job_id: int) -> None:
         self._q.put(job_id)
 
-    def enqueue_and_submit(self, recording_id: int) -> int:
-        job_id = jobs_mod.enqueue_process(recording_id)
+    def enqueue_and_submit(self, recording_id: int, kind: str = jobs_mod.KIND_PROCESS) -> int:
+        job_id = jobs_mod.enqueue(recording_id, kind)
         self.submit(job_id)
         return job_id
+
+    def on_capture_complete(self, recording_id: int, needs_processing: bool) -> None:
+        """Matches were already split off while capturing; only run the full
+        after-the-fact pipeline if live splitting didn't work."""
+        if needs_processing:
+            self.enqueue_and_submit(recording_id)
 
     def recover(self) -> None:
         """Re-queue jobs left behind by a restart."""
@@ -73,7 +79,11 @@ class JobWorker:
 worker = JobWorker()
 
 
-def wire_and_start() -> None:
-    recorder_manager.set_completion_callback(worker.enqueue_and_submit)
+def wire_and_start(recovered_recording_ids: list[int] | None = None) -> None:
+    recorder_manager.set_completion_callback(worker.on_capture_complete)
     worker.start()
     worker.recover()
+    # captures cut off by a restart: their live split state is gone, so run the
+    # full pipeline over the joined recording
+    for rid in recovered_recording_ids or []:
+        worker.enqueue_and_submit(rid)

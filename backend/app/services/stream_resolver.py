@@ -57,6 +57,8 @@ class StreamProbe:
     title: str = ""
     duration_s: float | None = None
     webpage_url: str = ""
+    # Unix time the broadcast started (yt-dlp ``release_timestamp``), if known.
+    release_timestamp: float | None = None
 
     @property
     def is_vod(self) -> bool:
@@ -127,7 +129,8 @@ def probe(url: str, *, timeout: float = 45.0) -> StreamProbe | None:
     try:
         out = subprocess.run(
             ["yt-dlp", "--skip-download", "--no-warnings", "--playlist-items", "1",
-             "--print", "%(is_live)s\t%(live_status)s\t%(duration)s\t%(webpage_url)s\t%(title)s",
+             "--print", "%(is_live)s\t%(live_status)s\t%(duration)s\t%(webpage_url)s\t"
+             "%(release_timestamp)s\t%(title)s",
              resolved.url],
             capture_output=True, text=True, timeout=timeout,
         )
@@ -140,17 +143,26 @@ def probe(url: str, *, timeout: float = 45.0) -> StreamProbe | None:
 
     line = next((ln for ln in out.stdout.splitlines() if "\t" in ln), "")
     parts = line.split("\t")
-    if len(parts) < 5:
+    if len(parts) < 6:
         return None
-    is_live_s, live_status, duration_s, webpage_url, title = parts[:5]
-    try:
-        duration = float(duration_s) if duration_s not in ("NA", "None", "") else None
-    except ValueError:
-        duration = None
+    is_live_s, live_status, duration_s, webpage_url, release_s = parts[:5]
+    title = "\t".join(parts[5:])
+    duration = _num(duration_s)
     return StreamProbe(
         is_live=is_live_s.strip().lower() == "true",
         was_live=live_status.strip() in ("was_live", "post_live"),
         title=title.strip(),
         duration_s=duration,
         webpage_url=webpage_url.strip() or resolved.url,
+        release_timestamp=_num(release_s),
     )
+
+
+def _num(text: str) -> float | None:
+    text = (text or "").strip()
+    if text in ("NA", "None", ""):
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None

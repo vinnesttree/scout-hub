@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, Recording } from "../api/client";
+import { Link } from "react-router-dom";
 import FolderPicker from "../components/FolderPicker";
 
 function fmtDur(s: number | null) {
@@ -32,6 +33,7 @@ export default function Recordings() {
 
   const stop = useMutation({ mutationFn: api.stopRecording, onSuccess: invalidate });
   const reprocess = useMutation({ mutationFn: api.processRecording, onSuccess: invalidate });
+  const refreshApi = useMutation({ mutationFn: api.refreshRecordingApi, onSuccess: invalidate });
   const del = useMutation({
     mutationFn: (v: { id: number; files: boolean }) => api.deleteRecording(v.id, v.files),
     onSuccess: invalidate,
@@ -75,7 +77,12 @@ export default function Recordings() {
               r={r}
               eventName={events.data?.find((e) => e.id === r.event_id)?.name}
               onStop={() => stop.mutate(r.id)}
-              onReprocess={() => reprocess.mutate(r.id)}
+              onReprocess={() => {
+                if (confirm("Re-process the full recording? Matches split while recording "
+                  + "(except ones you edited) are replaced."))
+                  reprocess.mutate(r.id);
+              }}
+              onRefreshApi={() => refreshApi.mutate(r.id)}
               onDelete={(files) => {
                 if (confirm(`Delete recording #${r.id}${files ? " and its files" : ""}?`))
                   del.mutate({ id: r.id, files });
@@ -111,11 +118,13 @@ export default function Recordings() {
 }
 
 function RecordingRow({
-  r, eventName, onStop, onReprocess, onDelete,
+  r, eventName, onStop, onReprocess, onRefreshApi, onDelete,
 }: {
   r: Recording; eventName?: string;
-  onStop: () => void; onReprocess: () => void; onDelete: (files: boolean) => void;
+  onStop: () => void; onReprocess: () => void; onRefreshApi: () => void;
+  onDelete: (files: boolean) => void;
 }) {
+  const busy = r.status === "recording" || r.status === "finalizing";
   return (
     <tr>
       <td>
@@ -135,17 +144,34 @@ function RecordingRow({
         {r.error && <div className="error" style={{ fontSize: 12 }}>{r.error}</div>}
       </td>
       <td>{fmtDur(r.duration_s)}</td>
-      <td>{r.match_count}</td>
-      <td className="muted" style={{ fontSize: 12, maxWidth: 240 }}>{r.progress}</td>
+      <td>
+        {r.match_count > 0
+          ? <Link to={`/matches?recording=${r.id}`}>{r.match_count}</Link>
+          : r.match_count}
+      </td>
+      <td className="muted" style={{ fontSize: 12, maxWidth: 260 }}>
+        <div>{r.progress}</div>
+        {r.split_status && (
+          <div className={r.split_status === "failed" ? "error" : undefined}>
+            {r.split_status === "running" ? "⏵ " : ""}{r.split_detail}
+            {busy && r.analyzed_s != null && r.duration_s != null && r.duration_s > r.analyzed_s + 60 &&
+              ` (${fmtDur(r.duration_s - r.analyzed_s)} still to analyse)`}
+          </div>
+        )}
+      </td>
       <td>
         <div className="stack">
           {r.status === "recording" && (
             <button className="sm" onClick={onStop}>Stop</button>
           )}
-          {r.status === "completed" && (
+          {r.status === "completed" && r.event_id != null && (
+            <button className="sm" onClick={onRefreshApi}
+              title="Check VEX Events again for teams and scores">Refresh from VEX Events</button>
+          )}
+          {r.status === "completed" && r.file_path && (
             <button className="sm" onClick={onReprocess}>Re-process</button>
           )}
-          <button className="sm danger" onClick={() => onDelete(false)}>Delete</button>
+          {!busy && <button className="sm danger" onClick={() => onDelete(false)}>Delete</button>}
         </div>
       </td>
     </tr>

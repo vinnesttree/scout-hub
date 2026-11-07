@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     clip_pad_start_s: float = 8.0
     clip_pad_end_s: float = 6.0
     sample_fps: float = 1.0
+    # Frame rate the live splitter samples at while a stream is being captured.
+    # Lower = less CPU (it has to keep up with the stream); boundaries are then
+    # accurate to about 1/live_sample_fps seconds, which clip padding covers.
+    live_sample_fps: float = 0.5
     keep_full_recording: bool = True
     overlay_profile: str = "vex_default"
 

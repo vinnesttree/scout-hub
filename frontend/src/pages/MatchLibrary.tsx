@@ -39,6 +39,7 @@ export default function MatchLibrary() {
 
   const [params] = useSearchParams();
   const [team, setTeam] = useState(params.get("team") ?? "");
+  const [recordingId, setRecordingId] = useState(params.get("recording") ?? "");
   const [eventId, setEventId] = useState("");
   const [round, setRound] = useState("");
   const [onlyClips, setOnlyClips] = useState(false);
@@ -47,10 +48,13 @@ export default function MatchLibrary() {
   const [groupByTeam, setGroupByTeam] = useState(false);
 
   const matches = useQuery({
-    queryKey: ["matches", { team, eventId, round, onlyClips, sort, order }],
+    queryKey: ["matches", { team, eventId, recordingId, round, onlyClips, sort, order }],
+    // matches appear (and get VEX Events data) while a stream is still recording
+    refetchInterval: 15_000,
     queryFn: () =>
       api.listMatches({
         team: team.trim().toUpperCase() || undefined,
+        recording_id: recordingId || undefined,
         event_id: eventId || undefined,
         round: round || undefined,
         has_clip: onlyClips ? true : undefined,
@@ -108,6 +112,12 @@ export default function MatchLibrary() {
               {ROUNDS.map((r) => <option key={r} value={r}>{r || "All rounds"}</option>)}
             </select>
           </div>
+          {recordingId && (
+            <span className="badge" style={{ marginBottom: 6 }}>
+              Recording #{recordingId}{" "}
+              <button type="button" className="sm" onClick={() => setRecordingId("")}>×</button>
+            </span>
+          )}
           <label style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
             <input type="checkbox" checked={onlyClips} onChange={(e) => setOnlyClips(e.target.checked)} />
             Has clip
@@ -187,6 +197,9 @@ function MatchTable({
             <ScoreCell m={m} />
             <td>
               <span className="pill">{m.detection_method}</span>
+              {m.provisional && (
+                <span className="pill estimate" title={m.review_note}> estimate</span>
+              )}
               {!m.has_clip && m.video_start_s == null && (
                 <span className="muted" style={{ fontSize: 11 }}> no video</span>
               )}

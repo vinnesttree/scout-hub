@@ -38,8 +38,7 @@ async def lifespan(app: FastAPI):
     from app.services.recorder import recover_orphans
     from app.worker import wire_and_start
 
-    recover_orphans()
-    wire_and_start()
+    wire_and_start(recover_orphans())
 
     from app.services.match_detect import tesseract_ready
 

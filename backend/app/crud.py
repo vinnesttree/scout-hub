@@ -50,6 +50,9 @@ def set_match_teams(
                 )
             )
     session.flush()
+    # the rows were replaced behind the relationship's back; reload it on next use
+    # so the match doesn't still hold (and cascade to) the deleted links
+    session.expire(match, ["teams"])
 
 
 def match_team_numbers(session: Session, match: Match) -> tuple[list[str], list[str]]:

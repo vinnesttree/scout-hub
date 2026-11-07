@@ -44,6 +44,8 @@ export interface AppSettings {
   clip_pad_start_s: number;
   clip_pad_end_s: number;
   sample_fps: number;
+  /** frame rate the live splitter samples at while capturing */
+  live_sample_fps: number;
   keep_full_recording: boolean;
   overlay_profile: string;
   overlay_profiles: string[];
@@ -63,7 +65,7 @@ export interface EventSearchOut {
 }
 
 export type RecordingStatus =
-  | "pending" | "recording" | "completed" | "failed" | "interrupted";
+  | "pending" | "recording" | "finalizing" | "completed" | "failed" | "interrupted";
 
 export interface Recording {
   id: number; source_url: string; source_type: string; status: RecordingStatus;
@@ -72,6 +74,9 @@ export interface Recording {
   progress: string; error: string | null;
   duration_s: number | null; started_at: string | null; ended_at: string | null;
   event_id: number | null; created_at: string; match_count: number;
+  /** live match splitting, which runs while the video is captured */
+  split_status: "" | "running" | "done" | "failed"; split_detail: string;
+  analyzed_s: number | null; video_started_at: string | null;
 }
 
 export interface TeamRef { number: string; name: string; station: number; }
@@ -84,6 +89,8 @@ export interface Match {
   review_note: string; red_score: number | null; blue_score: number | null;
   red_teams: TeamRef[]; blue_teams: TeamRef[]; has_clip: boolean;
   winner: "red" | "blue" | "tie" | null;
+  /** teams/score are on-screen estimates still waiting for VEX Events data */
+  provisional: boolean;
 }
 
 export interface Job {
@@ -147,6 +154,8 @@ export const api = {
     req<Recording>(`/api/recordings/${id}/stop`, { method: "POST" }),
   processRecording: (id: number) =>
     req<{ job_id: number }>(`/api/recordings/${id}/process`, { method: "POST" }),
+  refreshRecordingApi: (id: number) =>
+    req<{ job_id: number }>(`/api/recordings/${id}/refresh-api`, { method: "POST" }),
   deleteRecording: (id: number, deleteFiles: boolean) =>
     req<void>(`/api/recordings/${id}?delete_files=${deleteFiles}`, { method: "DELETE" }),
 
