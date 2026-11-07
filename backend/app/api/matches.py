@@ -72,6 +72,7 @@ def serialize(session: Session, m: Match) -> MatchOut:
         blue_teams=blue_teams,
         has_clip=bool(m.clip_path and Path(m.clip_path).exists()),
         winner=_winner(m.red_score, m.blue_score),
+        provisional=m.provisional,
     )
 
 
@@ -188,8 +189,10 @@ def patch_match(match_id: int, body: MatchPatch, session: Session = Depends(get_
     if body.video_end_s is not None and body.video_end_s != m.video_end_s:
         m.video_end_s, boundary_changed = body.video_end_s, True
 
-    # any human edit pins the row so re-processing won't wipe it
+    # any human edit pins the row so re-processing won't wipe it, and stops
+    # VEX Events refreshes from overwriting it
     m.detection_method = DetectionMethod.manual
+    m.provisional = False
     session.add(m)
 
     if body.red_teams is not None or body.blue_teams is not None:

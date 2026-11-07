@@ -242,6 +242,9 @@ class VexEventsClient:
         return matches
 
     def _match_from_row(self, r: dict) -> REMatch:
+        # Unplayed matches come back with score 0 and ``scored: false``; treat
+        # those scores as unknown so they aren't mistaken for a real 0-0.
+        scored = r.get("scored")
         alliances: list[REAlliance] = []
         for a in r.get("alliances", []):
             teams = [
@@ -255,7 +258,7 @@ class VexEventsClient:
             alliances.append(
                 REAlliance(
                     color=a.get("color", ""),
-                    score=a.get("score"),
+                    score=None if scored is False else a.get("score"),
                     teams=teams,
                 )
             )

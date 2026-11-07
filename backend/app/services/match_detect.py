@@ -31,6 +31,15 @@ _ROUND_WORDS = (
     "ELIMINATION", "ELIM", "MATCH", "ROUND", "R16", "OF", "RO16",
 )
 _ROUND_RE = re.compile(r"(" + "|".join(_ROUND_WORDS) + r")\s*#?\s*(\d{1,3})?")
+# overlay round word -> MatchRound value (words not listed carry no round info)
+_ROUND_WORD_MAP = {
+    "QUALIFICATION": "qual", "QUALIFIER": "qual", "QUALIFYING": "qual", "QUAL": "qual",
+    "PRACTICE": "practice",
+    "QUARTERFINAL": "qf", "QUARTERFINALS": "qf",
+    "SEMIFINAL": "sf", "SEMIFINALS": "sf",
+    "FINAL": "final", "FINALS": "final",
+    "R16": "r16", "RO16": "r16",
+}
 
 # A broadcast match window (incl. countdown into auton and the score reveal).
 MIN_WINDOW_S = 25.0
@@ -47,6 +56,10 @@ class MatchWindow:
     n_reads: int = 0
     timer_max: int | None = None
     timer_min: int | None = None
+    # Most common match number / round read off the overlay label inside the
+    # window (filled in by :func:`annotate_window`), e.g. 13 / "qual".
+    label_num: int | None = None
+    label_round: str | None = None
 
     @property
     def duration(self) -> float:
@@ -59,6 +72,7 @@ class TimerSample:
     seconds: int | None            # timer value in seconds, or None if no timer read
     overlay: bool = False          # match-label / header overlay visible this frame
     label_num: int | None = None   # match number parsed from the label, if any
+    label_round: str | None = None  # round parsed from the label ("qual", "sf", ...)
 
 
 # --------------------------------------------------------------------------
@@ -318,18 +332,22 @@ def _pad(img, frac: float):
     return cv2.copyMakeBorder(img, py, py, px, px, cv2.BORDER_REPLICATE)
 
 
-def read_match_label(frame_bgr, profile) -> tuple[bool, int | None]:
-    """OCR the round/number label. Returns (overlay_visible, match_number)."""
+def read_match_label(frame_bgr, profile) -> tuple[bool, int | None, str | None]:
+    """OCR the round/number label.
+
+    Returns ``(overlay_visible, match_number, round)``; ``round`` is a MatchRound
+    value ("qual", "sf", ...) when the label names one.
+    """
     try:
         import cv2  # noqa: PLC0415
         import pytesseract  # noqa: PLC0415
     except Exception:  # pragma: no cover
-        return False, None
+        return False, None, None
     from app.services.overlay import crop_norm
 
     crop = crop_norm(frame_bgr, profile.match_label_region)
     if crop.size == 0 or not _region_has_content(crop):
-        return False, None
+        return False, None, None
     crop = cv2.resize(crop, None, fx=3.0, fy=3.0, interpolation=cv2.INTER_CUBIC)
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
     _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
@@ -337,16 +355,16 @@ def read_match_label(frame_bgr, profile) -> tuple[bool, int | None]:
         try:
             text = pytesseract.image_to_string(img, config="--psm 6").upper()
         except pytesseract.TesseractError:  # pragma: no cover
-            return False, None
+            return False, None, None
         m = _ROUND_RE.search(text.replace("\n", " "))
         if m:
             num = int(m.group(2)) if m.group(2) else None
-            return True, num
+            return True, num, _ROUND_WORD_MAP.get(m.group(1))
         # a bare 1-3 digit number filling the region also counts as "label present"
         digits = re.findall(r"\b(\d{1,3})\b", text)
         if digits and len(re.sub(r"[^A-Z0-9]", "", text)) <= 6:
-            return True, int(digits[0])
-    return False, None
+            return True, int(digits[0]), None
+    return False, None, None
 
 
 def tesseract_ready() -> tuple[bool, str]:
@@ -387,8 +405,9 @@ def _scan(video: Path, profile, fps: float, workdir: Path,
             out.append(TimerSample(t, None))
             continue
         secs = read_timer(img, profile)
-        overlay, label_num = read_match_label(img, profile)
-        out.append(TimerSample(t, secs, overlay=overlay, label_num=label_num))
+        overlay, label_num, label_round = read_match_label(img, profile)
+        out.append(TimerSample(t, secs, overlay=overlay, label_num=label_num,
+                               label_round=label_round))
     return out
 
 
@@ -448,9 +467,24 @@ def detect_windows(
             tmp.rmdir()
 
 
-def _choose_windows(samples: list[TimerSample]) -> list[MatchWindow]:
+def annotate_window(w: MatchWindow, samples: list[TimerSample]) -> MatchWindow:
+    """Fill ``label_num`` / ``label_round`` with the values most often read off
+    the overlay label inside the window (OCR of a single frame is noisy)."""
+    from collections import Counter  # noqa: PLC0415
+
+    inside = [s for s in samples if w.start_s <= s.t <= w.end_s]
+    nums = Counter(s.label_num for s in inside if s.label_num is not None)
+    rounds = Counter(s.label_round for s in inside if s.label_round)
+    w.label_num = nums.most_common(1)[0][0] if nums else None
+    w.label_round = rounds.most_common(1)[0][0] if rounds else None
+    return w
+
+
+def _choose_windows(samples: list[TimerSample], *, verbose: bool = True) -> list[MatchWindow]:
     """Prefer the timer-countdown windows; fall back to label windows when the
     timer signal is weak but the overlay label is clearly present."""
+    # the live splitter re-runs this after every segment; keep that out of INFO
+    say = log.info if verbose else log.debug
     timer_hits = sum(1 for s in samples if s.seconds is not None)
     distinct_timer_vals = len({s.seconds for s in samples if s.seconds is not None})
     label_hits = sum(1 for s in samples if s.overlay)
@@ -460,16 +494,16 @@ def _choose_windows(samples: list[TimerSample]) -> list[MatchWindow]:
     timer_usable = distinct_timer_vals >= 4 and timer_hits >= 8 and timer_windows
 
     if timer_usable:
-        log.info("detect: %d windows (timer)", len(timer_windows))
+        say("detect: %d windows (timer)", len(timer_windows))
         return timer_windows
 
     label_windows = assemble_windows_from_labels(samples)
     if label_windows and (not timer_windows or label_hits > timer_hits):
-        log.info(
+        say(
             "detect: %d windows (match-label; timer signal weak: %d hits / %d distinct)",
             len(label_windows), timer_hits, distinct_timer_vals,
         )
         return label_windows
 
-    log.info("detect: %d windows (timer, weak)", len(timer_windows))
+    say("detect: %d windows (timer, weak)", len(timer_windows))
     return timer_windows

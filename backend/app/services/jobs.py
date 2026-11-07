@@ -36,12 +36,20 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def enqueue_process(recording_id: int) -> int:
+KIND_PROCESS = "process_recording"
+KIND_REFRESH_API = "refresh_api"
+
+
+def enqueue(recording_id: int, kind: str = KIND_PROCESS) -> int:
     with session_scope() as session:
-        job = Job(kind="process_recording", recording_id=recording_id, status=JobStatus.queued)
+        job = Job(kind=kind, recording_id=recording_id, status=JobStatus.queued)
         session.add(job)
         session.flush()
         return job.id
+
+
+def enqueue_process(recording_id: int) -> int:
+    return enqueue(recording_id, KIND_PROCESS)
 
 
 def run_job(job_id: int) -> None:
@@ -54,9 +62,15 @@ def run_job(job_id: int) -> None:
         job.error = None
         session.add(job)
         recording_id = job.recording_id
+        kind = job.kind
 
     try:
-        detail = process_recording(recording_id)
+        if kind == KIND_REFRESH_API:
+            from app.services import enrich
+
+            detail = enrich.refresh_recording(recording_id, final=True)
+        else:
+            detail = process_recording(recording_id)
         status, error = JobStatus.done, None
     except Exception as exc:  # pragma: no cover - defensive
         log.exception("job %s failed", job_id)

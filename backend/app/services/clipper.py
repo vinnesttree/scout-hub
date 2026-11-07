@@ -29,18 +29,20 @@ def cut(
     pad_start: float = 0.0,
     pad_end: float = 0.0,
     reencode: bool = True,
+    input_args: list[str] | tuple[str, ...] = (),
 ) -> Path:
     """Write ``dest`` covering ``[start_s-pad_start, end_s+pad_end]``.
 
     Re-encoding (default) gives frame-accurate cuts; ``reencode=False`` is a fast
-    stream copy that snaps to keyframes.
+    stream copy that snaps to keyframes. ``input_args`` go before ``-i`` (e.g.
+    ``["-f", "concat", "-safe", "0"]`` to cut from a list of live segments).
     """
     src_start = max(0.0, start_s - pad_start)
     duration = max(0.5, (end_s + pad_end) - src_start)
     dest.parent.mkdir(parents=True, exist_ok=True)
 
     cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{src_start:.3f}",
-           "-i", str(source), "-t", f"{duration:.3f}"]
+           *input_args, "-i", str(source), "-t", f"{duration:.3f}"]
     if reencode:
         cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
                 "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart"]

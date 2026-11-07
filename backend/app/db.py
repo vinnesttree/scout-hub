@@ -32,6 +32,13 @@ _ADDED_COLUMNS: dict[str, dict[str, str]] = {
     "recording": {
         "is_live": "BOOLEAN",
         "sections": "VARCHAR",
+        "video_started_at": "DATETIME",
+        "split_status": "VARCHAR NOT NULL DEFAULT ''",
+        "split_detail": "VARCHAR NOT NULL DEFAULT ''",
+        "analyzed_s": "FLOAT",
+    },
+    "match": {
+        "provisional": "BOOLEAN NOT NULL DEFAULT 0",
     },
 }
 

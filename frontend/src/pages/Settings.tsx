@@ -19,6 +19,7 @@ export default function Settings() {
         clip_pad_start_s: form.clip_pad_start_s,
         clip_pad_end_s: form.clip_pad_end_s,
         sample_fps: form.sample_fps,
+        live_sample_fps: form.live_sample_fps,
         keep_full_recording: form.keep_full_recording,
         overlay_profile: form.overlay_profile,
       };
@@ -107,6 +108,12 @@ export default function Settings() {
             <label>Detection sample rate (fps)</label>
             <input type="number" step="0.25" style={{ width: 100 }} value={form.sample_fps ?? ""}
               onChange={(e) => set({ sample_fps: Number(e.target.value) })} />
+          </div>
+          <div className="field">
+            <label title="Frames per second read while a stream is still being captured. Lower uses less CPU so splitting keeps up with a live stream.">
+              Live splitting rate (fps)</label>
+            <input type="number" step="0.25" min="0.1" style={{ width: 100 }} value={form.live_sample_fps ?? ""}
+              onChange={(e) => set({ live_sample_fps: Number(e.target.value) })} />
           </div>
           <div className="field">
             <label>Overlay profile</label>

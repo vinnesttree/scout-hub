@@ -72,7 +72,8 @@ tbody tr:hover { background: var(--panel-2); }
 tr.clickable { cursor: pointer; }
 
 .pill { font-size: 11px; padding: 2px 7px; border-radius: 20px; border: 1px solid var(--border); color: var(--muted); }
-.pill.recording { color: var(--warn); border-color: #5c4d1e; }
+.pill.recording, .pill.finalizing { color: var(--warn); border-color: #5c4d1e; }
+.pill.estimate { color: var(--warn); border-color: #5c4d1e; }
 .pill.completed { color: var(--green); border-color: #2c5c3c; }
 .pill.failed, .pill.interrupted { color: var(--red); border-color: #5c2b2b; }
 .pill.running { color: var(--accent); }

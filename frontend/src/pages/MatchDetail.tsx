@@ -29,6 +29,7 @@ function ReadOnlyMatch({ m, onClose }: { m: Match; onClose: () => void }) {
         <div className="row">
           <h1 style={{ margin: 0 }}>{m.name || `Match ${m.id}`}</h1>
           <span className="pill">{m.round}</span>
+          {m.provisional && <span className="pill estimate" title={m.review_note}>estimate</span>}
           <div className="spacer" />
           <button className="sm" onClick={onClose}>Close</button>
         </div>
@@ -148,6 +149,7 @@ export default function MatchDetail() {
         <div className="row">
           <h1 style={{ margin: 0 }}>{m.name || `Match ${m.id}`}</h1>
           <span className="pill">{m.detection_method}</span>
+          {m.provisional && <span className="pill estimate">estimate</span>}
           {m.detection_confidence != null && (
             <span className="muted">conf {(m.detection_confidence * 100).toFixed(0)}%</span>
           )}

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-import threading
+import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -16,7 +16,8 @@ from app.models import Event, Match, Recording, RecordingStatus
 from app.api.events import get_or_import_event
 from app.schemas import RecordingCreate, RecordingOut
 from app.services import stream_resolver
-from app.services.recorder import manager as recorder_manager
+from app.services.recorder import manager as recorder_manager, segments_dir
+from app.services import jobs as jobs_mod
 from app.worker import worker
 
 # Recordings are admin-area only: every endpoint needs a signed-in account.
@@ -140,6 +141,21 @@ def reprocess(rec_id: int, session: Session = Depends(get_session)) -> dict:
     return {"job_id": job_id}
 
 
+@router.post("/{rec_id}/refresh-api", response_model=dict)
+def refresh_from_api(rec_id: int, session: Session = Depends(get_session)) -> dict:
+    """Re-check VEX Events for this recording's matches: link provisional ones
+    and pull in teams/scores posted since. (Runs automatically while capturing.)"""
+    rec = session.get(Recording, rec_id)
+    if not rec:
+        raise HTTPException(404, "recording not found")
+    if rec.event_id is None:
+        raise HTTPException(409, "recording has no linked event")
+    if recorder_manager.is_running(rec_id):
+        raise HTTPException(409, "the recording is still capturing; it refreshes on its own")
+    job_id = worker.enqueue_and_submit(rec_id, jobs_mod.KIND_REFRESH_API)
+    return {"job_id": job_id}
+
+
 @router.delete("/{rec_id}", status_code=204)
 def delete_recording(
     rec_id: int, delete_files: bool = False, session: Session = Depends(get_session)
@@ -148,7 +164,7 @@ def delete_recording(
     if not rec:
         return
     if recorder_manager.is_running(rec_id):
-        raise HTTPException(409, "stop the recording first")
+        raise HTTPException(409, "stop the recording first (and let it finish splitting)")
     matches = session.exec(select(Match).where(Match.recording_id == rec_id)).all()
     if delete_files:
         for m in matches:
@@ -157,6 +173,7 @@ def delete_recording(
                     Path(f).unlink()
         if rec.file_path and Path(rec.file_path).exists():
             Path(rec.file_path).unlink()
+        shutil.rmtree(segments_dir(rec), ignore_errors=True)
     for m in matches:
         for link in list(m.teams):
             session.delete(link)

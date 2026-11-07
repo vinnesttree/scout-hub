@@ -16,6 +16,7 @@ class SettingsIn(BaseModel):
     clip_pad_start_s: float | None = None
     clip_pad_end_s: float | None = None
     sample_fps: float | None = None
+    live_sample_fps: float | None = None
     keep_full_recording: bool | None = None
     overlay_profile: str | None = None
 
@@ -100,6 +101,10 @@ class RecordingOut(BaseModel):
     ended_at: datetime | None
     event_id: int | None
     created_at: datetime
+    video_started_at: datetime | None = None
+    split_status: str = ""
+    split_detail: str = ""
+    analyzed_s: float | None = None
     match_count: int = 0
 
     model_config = ConfigDict(from_attributes=True)
@@ -135,6 +140,7 @@ class MatchOut(BaseModel):
     blue_teams: list[TeamOut] = []
     has_clip: bool = False
     winner: str | None = None
+    provisional: bool = False
 
 
 class MatchCreate(BaseModel):
