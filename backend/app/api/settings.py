@@ -118,7 +118,8 @@ def get_overlay_profiles() -> list[OverlayProfileOut]:
 
 @router.put("/overlay-profiles/{name}", response_model=OverlayProfileOut)
 def put_overlay_profile(name: str, body: OverlayProfileOut) -> OverlayProfileOut:
-    data = body.model_dump()
+    # regions left out keep the profile's default (from_dict fills them in)
+    data = {k: v for k, v in body.model_dump().items() if v is not None}
     data["name"] = name
     profile = OverlayProfile.from_dict(data)
     save_profile(profile)

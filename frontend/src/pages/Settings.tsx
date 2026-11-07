@@ -22,6 +22,8 @@ export default function Settings() {
         live_sample_fps: form.live_sample_fps,
         keep_full_recording: form.keep_full_recording,
         overlay_profile: form.overlay_profile,
+        keyframe_detection: form.keyframe_detection,
+        intro_match_length_s: form.intro_match_length_s,
       };
       if (token.trim()) (body as Record<string, unknown>).vexevents_token = token.trim();
       return api.putSettings(body);
@@ -121,6 +123,18 @@ export default function Settings() {
               {s?.overlay_profiles.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
+          <div className="field">
+            <label title="Only used on streams where neither the match clock nor the match label can be read: each match is taken to run this long after its team-intro card.">
+              Match length after intro (s)</label>
+            <input type="number" step="5" min="30" style={{ width: 100 }} value={form.intro_match_length_s ?? ""}
+              onChange={(e) => set({ intro_match_length_s: Number(e.target.value) })} />
+          </div>
+          <label style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}
+            title="Once trained (Admin → Key frames), the detector spots each match's team-intro card and reads the teams off it.">
+            <input type="checkbox" checked={form.keyframe_detection ?? true}
+              onChange={(e) => set({ keyframe_detection: e.target.checked })} />
+            Use trained team-intro detector
+          </label>
           <label style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
             <input type="checkbox" checked={form.keep_full_recording ?? true}
               onChange={(e) => set({ keep_full_recording: e.target.checked })} />

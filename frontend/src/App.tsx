@@ -8,6 +8,7 @@ import MatchDetail from "./pages/MatchDetail";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import Users from "./pages/Users";
+import KeyFrames from "./pages/KeyFrames";
 
 function ToolBadge() {
   const { data } = useQuery({ queryKey: ["health"], queryFn: api.health });
@@ -35,7 +36,7 @@ function AccountMenu() {
       nav("/matches");
       qc.setQueryData(["me"], { user: null, setup_required: false });
       // drop cached admin-only responses
-      for (const key of ["recordings", "jobs", "settings", "users"]) {
+      for (const key of ["recordings", "jobs", "settings", "users", "keyframes", "keyframe-summary"]) {
         qc.removeQueries({ queryKey: [key] });
       }
       qc.invalidateQueries({ queryKey: ["me"] });
@@ -55,6 +56,7 @@ function AdminLayout() {
     <RequireAuth>
       <nav className="subnav">
         <NavLink to="/admin" end>Recordings</NavLink>
+        <NavLink to="/admin/keyframes">Key frames</NavLink>
         <NavLink to="/admin/settings">Settings &amp; events</NavLink>
         <NavLink to="/admin/users">Accounts</NavLink>
       </nav>
@@ -86,6 +88,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<Recordings />} />
+            <Route path="keyframes" element={<KeyFrames />} />
             <Route path="settings" element={<Settings />} />
             <Route path="users" element={<Users />} />
           </Route>

@@ -58,10 +58,12 @@ _ROUND_NAMES = {
 class WindowTracker:
     """Incremental match-window assembly over a growing list of samples."""
 
-    def __init__(self, *, step_s: float = 2.0, settle_s: float = SETTLE_S) -> None:
+    def __init__(self, *, step_s: float = 2.0, settle_s: float = SETTLE_S,
+                 intro_match_len_s: float = match_detect.INTRO_MATCH_LEN_S) -> None:
         self.samples: list[TimerSample] = []
         self.emitted: list[MatchWindow] = []
         self.settle_s = settle_s + 2 * step_s
+        self.intro_match_len_s = intro_match_len_s
 
     def add(self, samples: list[TimerSample]) -> None:
         self.samples.extend(samples)
@@ -70,7 +72,8 @@ class WindowTracker:
         """Windows that can no longer change and haven't been handed out yet.
         ``final``: the capture is over, so every remaining window is settled."""
         out = []
-        for w in match_detect._choose_windows(self.samples, verbose=False):
+        for w in match_detect._choose_windows(self.samples, verbose=False,
+                                              intro_match_len_s=self.intro_match_len_s):
             if not final and w.end_s + self.settle_s > analyzed_until:
                 continue
             if any(w.start_s < e.end_s + 5 and w.end_s > e.start_s - 5 for e in self.emitted):
@@ -141,7 +144,11 @@ class LiveSplitter:
         self.cfg = cfg
         self.profile = load_profile(cfg["overlay_profile"])
         self.fps = max(0.05, float(cfg.get("live_sample_fps") or 0.5))
-        tracker = WindowTracker(step_s=1.0 / self.fps)
+        from app.services import keyframes  # noqa: PLC0415
+
+        self.intro_model = keyframes.active_model(cfg)
+        tracker = WindowTracker(step_s=1.0 / self.fps,
+                                intro_match_len_s=float(cfg.get("intro_match_length_s") or 135.0))
 
         while True:
             # read the flag *before* looking for segments: once it is set, the
@@ -177,7 +184,8 @@ class LiveSplitter:
     # -- per segment / per window -----------------------------------------
 
     def _analyze(self, seg: Segment) -> list[TimerSample]:
-        samples = match_detect._scan(seg.path, self.profile, self.fps, self._workdir / "frames")
+        samples = match_detect._scan(seg.path, self.profile, self.fps, self._workdir / "frames",
+                                     intro_model=self.intro_model)
         for s in samples:
             s.t = round(seg.start_s + s.t, 3)
         return [s for s in samples if s.t < seg.end_s]
@@ -188,6 +196,7 @@ class LiveSplitter:
         read = ocr.read_overlay(
             None, w.start_s, w.end_s, self.profile,
             self._workdir / f"ocr_{int(w.start_s)}", grab=self.store.grab_frame,
+            intro_t=w.intro_t,
         )
         provisional = self.event_id is not None
         with session_scope() as session:

@@ -38,6 +38,7 @@ def _now() -> datetime:
 
 KIND_PROCESS = "process_recording"
 KIND_REFRESH_API = "refresh_api"
+KIND_FIND_KEYFRAMES = "find_keyframes"
 
 
 def enqueue(recording_id: int, kind: str = KIND_PROCESS) -> int:
@@ -69,6 +70,10 @@ def run_job(job_id: int) -> None:
             from app.services import enrich
 
             detail = enrich.refresh_recording(recording_id, final=True)
+        elif kind == KIND_FIND_KEYFRAMES:
+            from app.services import keyframes
+
+            detail = keyframes.find_for_recording(recording_id)
         else:
             detail = process_recording(recording_id)
         status, error = JobStatus.done, None
@@ -104,10 +109,14 @@ def process_recording(recording_id: int) -> str:
         cfg = settings_store.get_all(session)
 
     profile = load_profile(cfg["overlay_profile"])
+    from app.services import keyframes  # noqa: PLC0415
+
     workdir = Path(tempfile.mkdtemp(prefix="scouthub_proc_"))
     try:
         windows = match_detect.detect_windows(
-            video, profile, sample_fps=float(cfg["sample_fps"]), workdir=workdir / "frames"
+            video, profile, sample_fps=float(cfg["sample_fps"]), workdir=workdir / "frames",
+            intro_model=keyframes.active_model(cfg),
+            intro_match_len_s=float(cfg["intro_match_length_s"]),
         )
 
         with session_scope() as session:
@@ -221,7 +230,8 @@ def _one_ocr_match(
     name: str | None = None, note: str = "",
 ) -> None:
     read = ocr.read_overlay(
-        video, window.start_s, window.end_s, profile, workdir / f"ocr_{int(window.start_s)}"
+        video, window.start_s, window.end_s, profile, workdir / f"ocr_{int(window.start_s)}",
+        intro_t=window.intro_t,
     )
     with session_scope() as session:
         match = Match(

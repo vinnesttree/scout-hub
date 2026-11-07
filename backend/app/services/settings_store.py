@@ -32,6 +32,8 @@ KNOBS: dict[str, Knob] = {
     "live_sample_fps": Knob("live_sample_fps", float, "Live splitting sample rate (fps)"),
     "keep_full_recording": Knob("keep_full_recording", bool, "Keep full recording after clipping"),
     "overlay_profile": Knob("overlay_profile", str, "Broadcast overlay profile"),
+    "keyframe_detection": Knob("keyframe_detection", bool, "Use the trained team-intro detector"),
+    "intro_match_length_s": Knob("intro_match_length_s", float, "Match length after the intro (s)"),
 }
 
 

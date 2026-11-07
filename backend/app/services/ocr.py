@@ -103,11 +103,16 @@ def _candidate_tokens(text: str) -> list[str]:
     return out
 
 
-def _vote_teams(samples: list[str]) -> list[str]:
+# Reads of the full-screen intro card count double: its team numbers are
+# several times larger than the in-match overlay's.
+INTRO_VOTE_WEIGHT = 2
+
+
+def _vote_teams(samples: list[str], weighted: list[tuple[str, int]] = ()) -> list[str]:
     counter: Counter[str] = Counter()
-    for text in samples:
+    for text, weight in [(t, 1) for t in samples] + list(weighted):
         for tok in _candidate_tokens(text):
-            counter[tok] += 1
+            counter[tok] += weight
     return [tok for tok, _ in counter.most_common(3)]
 
 
@@ -129,12 +134,17 @@ def read_overlay(
     workdir: Path,
     *,
     grab=None,
+    intro_t: float | None = None,
 ) -> OverlayRead:
     """OCR teams + score around a match window.
 
     ``grab(t, dest) -> Path | None`` extracts one frame at recording time ``t``;
     it defaults to seeking in ``video``. The live splitter passes one that reads
     from the capture's finished segments instead.
+
+    ``intro_t``: when the pre-match team-intro card was on screen (found by the
+    trained intro detector). Its team numbers are large, so they are read too
+    (``profile.intro_*_teams_region``) and vote alongside the in-match overlay.
     """
     if grab is None:
         def grab(t: float, dest: Path) -> Path | None:
@@ -153,6 +163,7 @@ def read_overlay(
 
     red_team_texts, blue_team_texts = [], []
     red_score_texts, blue_score_texts = [], []
+    red_intro_texts, blue_intro_texts = [], []
 
     for i, t in enumerate(team_ts):
         f = grab(t, workdir / f"team_{i}.jpg")
@@ -163,6 +174,19 @@ def read_overlay(
             continue
         red_team_texts.append(_ocr_region(img, profile.red_teams_region, digits_only=False))
         blue_team_texts.append(_ocr_region(img, profile.blue_teams_region, digits_only=False))
+
+    if intro_t is not None:
+        for i, t in enumerate((intro_t - 0.5, intro_t, intro_t + 0.5)):
+            if t < 0:
+                continue
+            f = grab(t, workdir / f"intro_{i}.jpg")
+            img = cv2.imread(str(f)) if f else None
+            if img is None:
+                continue
+            red_intro_texts.append(
+                (_ocr_region(img, profile.intro_red_teams_region, digits_only=False), INTRO_VOTE_WEIGHT))
+            blue_intro_texts.append(
+                (_ocr_region(img, profile.intro_blue_teams_region, digits_only=False), INTRO_VOTE_WEIGHT))
 
     for i, t in enumerate(score_ts):
         if t < start_s:
@@ -177,8 +201,8 @@ def read_overlay(
         blue_score_texts.append(_ocr_region(img, profile.blue_score_region, digits_only=True))
 
     return OverlayRead(
-        red_teams=_vote_teams(red_team_texts),
-        blue_teams=_vote_teams(blue_team_texts),
+        red_teams=_vote_teams(red_team_texts, red_intro_texts),
+        blue_teams=_vote_teams(blue_team_texts, blue_intro_texts),
         red_score=_vote_score(red_score_texts),
         blue_score=_vote_score(blue_score_texts),
     )

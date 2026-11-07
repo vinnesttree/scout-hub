@@ -48,6 +48,10 @@ export interface AppSettings {
   live_sample_fps: number;
   keep_full_recording: boolean;
   overlay_profile: string;
+  /** use the trained team-intro detector (when one has been trained) */
+  keyframe_detection: boolean;
+  /** intro-only streams: how long a match runs after its intro card */
+  intro_match_length_s: number;
   overlay_profiles: string[];
   archive_root: string;
 }
@@ -97,6 +101,44 @@ export interface Job {
   id: number; kind: string; recording_id: number | null; status: string;
   detail: string; error: string | null; created_at: string;
   started_at: string | null; finished_at: string | null;
+}
+
+export type KeyFrameStatus = "candidate" | "confirmed" | "rejected";
+
+export interface KeyFrameAlt {
+  t: number; score: number;
+  /** match clock read on this frame (so it is the match, not the intro) */
+  timer: number | null;
+  /** team-number-like text OCR found on the frame */
+  tokens: string[];
+}
+
+export interface KeyFrame {
+  id: number; recording_id: number; match_id: number | null; match_name: string;
+  anchor_start_s: number; anchor_end_s: number;
+  t: number; run_start_s: number; run_end_s: number; score: number;
+  status: KeyFrameStatus; alternatives: KeyFrameAlt[];
+  created_at: string; reviewed_at: string | null;
+}
+
+export interface KeyFrameModelInfo {
+  trained: boolean; trained_at?: string; threshold?: number;
+  confirmed?: number; rejected?: number;
+  positive_frames?: number; negative_frames?: number; cv_folds?: number;
+  cv?: {
+    precision: number; recall: number; f1: number; false_positives: number;
+    missed: number; intros_found: number; intros_total: number;
+  };
+  recordings?: number[]; warning?: string;
+  /** rejected key frames that look just like confirmed intros (likely review slips) */
+  conflicts?: number[];
+}
+
+export interface KeyFrameSummary {
+  recordings: ({ recording_id: number } & Record<KeyFrameStatus, number>)[];
+  totals: Record<KeyFrameStatus, number>;
+  min_confirmed: number;
+  model: KeyFrameModelInfo;
 }
 
 export interface User {
@@ -174,6 +216,25 @@ export const api = {
     req<void>(`/api/matches/${id}?delete_files=${deleteFiles}`, { method: "DELETE" }),
   clipUrl: (id: number) => `/api/matches/${id}/clip`,
   thumbUrl: (id: number) => `/api/matches/${id}/thumb`,
+
+  listKeyFrames: (params: { recording_id?: number; status?: string }) => {
+    const q = new URLSearchParams();
+    if (params.recording_id) q.set("recording_id", String(params.recording_id));
+    if (params.status) q.set("status", params.status);
+    return req<KeyFrame[]>(`/api/keyframes?${q.toString()}`);
+  },
+  keyFrameSummary: () => req<KeyFrameSummary>("/api/keyframes/summary"),
+  findKeyFrames: (recordingId: number) =>
+    req<{ job_id: number }>(`/api/keyframes/find?recording_id=${recordingId}`, { method: "POST" }),
+  patchKeyFrame: (id: number, body: { status?: KeyFrameStatus; t?: number }) =>
+    req<KeyFrame>(`/api/keyframes/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+  bulkKeyFrames: (ids: number[], status: KeyFrameStatus) =>
+    req<{ updated: number }>("/api/keyframes/bulk", { method: "POST", body: JSON.stringify({ ids, status }) }),
+  deleteKeyFrames: (recordingId: number) =>
+    req<void>(`/api/keyframes?recording_id=${recordingId}`, { method: "DELETE" }),
+  trainKeyFrames: () => req<KeyFrameModelInfo>("/api/keyframes/train", { method: "POST" }),
+  deleteKeyFrameModel: () => req<void>("/api/keyframes/model", { method: "DELETE" }),
+  keyFrameImageUrl: (id: number, t: number) => `/api/keyframes/${id}/image?t=${t}`,
 
   listJobs: (recordingId?: number) =>
     req<Job[]>("/api/jobs" + (recordingId ? `?recording_id=${recordingId}` : "")),

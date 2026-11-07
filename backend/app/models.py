@@ -237,3 +237,35 @@ class AuthSession(SQLModel, table=True):
     user_id: int = Field(foreign_key="user.id", index=True)
     created_at: datetime = Field(default_factory=utcnow)
     expires_at: datetime
+
+
+# --- trainable intro (key frame) detection --------------------------------
+
+
+class KeyFrame(SQLModel, table=True):
+    """A candidate pre-match team-intro frame, found before one match of a
+    recording and waiting for (or past) a person's review. Only ``confirmed``
+    and ``rejected`` rows are used to train the intro detector; see
+    :mod:`app.services.keyframes`."""
+
+    __tablename__ = "key_frame"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    recording_id: int = Field(foreign_key="recording.id", index=True)
+    match_id: Optional[int] = Field(default=None, index=True)
+    match_name: str = ""
+    # the match this intro precedes (seconds into the recording)
+    anchor_start_s: float = 0.0
+    anchor_end_s: float = 0.0
+    # the chosen frame, and how long the same card stays on screen around it
+    t: float = 0.0
+    run_start_s: float = 0.0
+    run_end_s: float = 0.0
+    score: float = 0.0
+    status: str = Field(default="candidate", index=True)  # candidate | confirmed | rejected
+    # JSON list of {t, score, timer, tokens, file}: the chosen frame + alternatives
+    alternatives_json: str = "[]"
+    # .npz (under <data>/keyframes/rec_<id>/) with every sampled frame's descriptor
+    features_file: str = ""
+    created_at: datetime = Field(default_factory=utcnow)
+    reviewed_at: Optional[datetime] = None

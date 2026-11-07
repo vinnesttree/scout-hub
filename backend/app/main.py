@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from app import __version__
 from app.config import get_settings
 from app.db import init_db
-from app.api import auth, events, jobs, matches, recordings, settings
+from app.api import auth, events, jobs, keyframes, matches, recordings, settings
 
 logging.basicConfig(
     level=logging.INFO,
@@ -72,6 +72,7 @@ app.include_router(events.router)
 app.include_router(recordings.router)
 app.include_router(matches.router)
 app.include_router(jobs.router)
+app.include_router(keyframes.router)
 
 
 @app.get("/api/health")

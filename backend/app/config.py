@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     live_sample_fps: float = 0.5
     keep_full_recording: bool = True
     overlay_profile: str = "vex_default"
+    # Use the trained team-intro (key frame) detector when one has been trained.
+    keyframe_detection: bool = True
+    # Streams with only the intro card to go on: a match is taken to run this
+    # long after its intro ends (VRC/VEXU: 2:00 on the clock + pauses).
+    intro_match_length_s: float = 135.0
 
     # --- accounts / auth ------------------------------------------------
     # Optional bootstrap admin, created at startup if no account with this

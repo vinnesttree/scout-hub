@@ -19,6 +19,8 @@ class SettingsIn(BaseModel):
     live_sample_fps: float | None = None
     keep_full_recording: bool | None = None
     overlay_profile: str | None = None
+    keyframe_detection: bool | None = None
+    intro_match_length_s: float | None = None
 
 
 # --- filesystem picker ---------------------------------------------
@@ -197,6 +199,10 @@ class OverlayProfileOut(BaseModel):
     red_score_region: list[float]
     blue_score_region: list[float]
     timer_invert: bool
+    # optional on PUT: left out = the profile default
+    match_label_region: list[float] | None = None
+    intro_red_teams_region: list[float] | None = None
+    intro_blue_teams_region: list[float] | None = None
 
 
 # --- accounts --------------------------------------------------
@@ -233,3 +239,40 @@ class UserPatch(BaseModel):
     # required when changing your own password
     current_password: str | None = None
     is_admin: bool | None = None
+
+
+# --- key frames (team intro detector) ---------------------------------
+
+class KeyFrameAlt(BaseModel):
+    t: float
+    score: float
+    timer: int | None = None
+    tokens: list[str] = []
+
+
+class KeyFrameOut(BaseModel):
+    id: int
+    recording_id: int
+    match_id: int | None
+    match_name: str
+    anchor_start_s: float
+    anchor_end_s: float
+    t: float
+    run_start_s: float
+    run_end_s: float
+    score: float
+    status: str
+    alternatives: list[KeyFrameAlt] = []
+    created_at: datetime
+    reviewed_at: datetime | None
+
+
+class KeyFramePatch(BaseModel):
+    status: str | None = None   # candidate | confirmed | rejected
+    # pick one of the candidate's alternative frames instead
+    t: float | None = None
+
+
+class KeyFrameBulk(BaseModel):
+    ids: list[int]
+    status: str

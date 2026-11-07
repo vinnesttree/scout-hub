@@ -202,6 +202,8 @@ python scripts/seed_demo.py sample.mp4 --archive-subdir demo
     streams. Set this in **Settings → overlay profile**.
   Broadcasts vary — if detection or OCR is off, adjust the rectangles for that
   event's layout (`PUT /api/overlay-profiles/{name}`) and re-process.
+- **Trainable team-intro detector** (see below): once trained, a third signal —
+  the full-screen card showing both alliances just before each countdown.
 - **Live splitting** runs the same window assembly over the frames read so far.
   A window is acted on once the stream is ~30 s past its end (nothing later can
   still extend it); the last match is finished when the capture ends.
@@ -224,6 +226,54 @@ python scripts/seed_demo.py sample.mp4 --archive-subdir demo
   with no graphics) can't be auto-split. Link the event and add match boundaries
   by hand in Match Detail, or record from a feed that carries the TM overlay.
 
+## Training the team-intro detector (key frames)
+
+Most broadcasts show a full-screen card with both alliances' teams for a few
+seconds **before each match's countdown starts**. That card looks the same before
+every match (only the numbers change), so Scout Hub can learn to recognise it
+from a handful of examples you confirm. Nothing is trained on frames a person
+hasn't reviewed.
+
+1. **Admin → Key frames → Find key frames** for a completed recording that has
+   matches (split live, re-processed, or added by hand) and whose full video was
+   kept. For each match it samples the 90 s before the countdown (1 fps) and
+   ranks the frames:
+   - how alike the frame is to frames before the *other* matches (the card recurs),
+   - whether strong red **and** blue areas are both on screen,
+   - whether OCR finds team numbers on the left and right halves.
+   Frames where the match timer is already readable are ruled out: that's the
+   match, not the intro. The best frame per match and up to four alternatives are
+   saved under `<data>/keyframes/`.
+2. **Review**: each card shows the chosen frame, when the same card is on screen
+   (the frames that will be used for training), and the teams OCR read off it.
+   Click **✓ Team intro** or **✗ Not the intro**. If the frame is wrong but the intro
+   is among the alternatives, click that one and confirm it. *Confirm all shown*
+   does a page at once — only after you've looked at them.
+3. **Train on N confirmed** (at least 3). Positives are the frames of each
+   confirmed intro. Negatives are the other frames sampled around it, the frames
+   of rejected candidates, and gameplay frames from inside the matches. The model
+   is a nearest-example classifier on a small appearance descriptor (grey-level
+   layout, colour histogram, edge layout). Its threshold, and the
+   **held-out check** shown on the page (intros found, frame precision/recall),
+   come from cross-validation that holds out whole intros. If a rejected frame is
+   a near-copy of confirmed intros, training flags it as a likely review slip.
+   Retrain whenever you've reviewed more; review a recording from each new
+   broadcast layout you record.
+
+With a model trained (and *Use trained team-intro detector* on in Settings),
+every sampled frame is also checked for the intro card — cheap, no OCR. Then:
+- each match is tagged with the intro shown just before it, and its teams are
+  also read off that card (`intro_red_teams_region` / `intro_blue_teams_region`
+  in the overlay profile; red left, blue right by default). Those reads count
+  double in the team vote, since the card's numbers are much larger;
+- on streams where **neither the clock nor the match label** can be read, a
+  match is taken to start where its intro ends and to run *Match length after
+  intro* (default 135 s) or until the next intro.
+
+Timer and label detection still run on every frame and still win when they
+work. The intro only fills gaps, so a wrong model can't hide a working clock.
+**Delete model** returns to timer/label-only detection.
+
 ## Key API endpoints
 
 | Method & path | Purpose |
@@ -237,6 +287,10 @@ python scripts/seed_demo.py sample.mp4 --archive-subdir demo
 | `PATCH /api/matches/{id}` | edit boundaries / teams / score (re-clips) |
 | `GET /api/matches/{id}/clip` | range-request video stream |
 | `GET /api/events/search?q=` · `POST /api/events/import` | VEX Events lookup/import by events.vex.com link or event code |
+| `POST /api/keyframes/find?recording_id=` | queue a search for team-intro candidates before each match |
+| `GET /api/keyframes?recording_id=&status=` · `PATCH /api/keyframes/{id}` · `POST /api/keyframes/bulk` | list / review candidates (`status`: candidate, confirmed, rejected; `t`: pick an alternative frame) |
+| `GET /api/keyframes/{id}/image?t=` | a candidate's frame |
+| `POST /api/keyframes/train` · `GET /api/keyframes/summary` · `DELETE /api/keyframes/model` | train the intro detector on reviewed frames / review counts + model stats / remove it |
 | `GET /api/health` | tool + OCR readiness |
 
 Everything except `GET /api/matches…`, `GET /api/events`, `GET /api/health` and

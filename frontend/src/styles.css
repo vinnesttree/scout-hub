@@ -119,3 +119,21 @@ video { width: 100%; border-radius: 8px; background: #000; }
 .auth-panel { max-width: 420px; margin: 40px auto; }
 a.team { color: var(--text); }
 a.team:hover { background: #283039; }
+
+/* key frames */
+.kf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+.kf-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+.kf-card.confirmed { border-color: #2c5c3c; box-shadow: inset 0 3px 0 var(--green); }
+.kf-card.rejected { border-color: #5c2b2b; box-shadow: inset 0 3px 0 var(--red); }
+.kf-card .kf-main { width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: #000; display: block; }
+.kf-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.kf-alts { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.kf-alt { flex: 0 0 auto; padding: 0; border: 2px solid transparent; background: none; border-radius: 4px; position: relative; }
+.kf-alt img { width: 76px; height: 43px; object-fit: cover; display: block; border-radius: 3px; background: #000; }
+.kf-alt.selected { border-color: var(--accent); }
+.kf-alt .kf-tag { position: absolute; left: 2px; bottom: 2px; font-size: 10px; background: rgba(0,0,0,0.75); padding: 0 3px; border-radius: 3px; }
+.kf-alt .kf-tag.clock { color: var(--warn); }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tabs button.active { border-color: var(--accent); color: var(--accent); }
+.stat { display: flex; flex-direction: column; }
+.stat b { font-size: 18px; font-variant-numeric: tabular-nums; }

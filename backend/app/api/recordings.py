@@ -178,5 +178,9 @@ def delete_recording(
         for link in list(m.teams):
             session.delete(link)
         session.delete(m)
+    # its review frames go too (an already-trained model keeps what it learned)
+    from app.services import keyframes  # noqa: PLC0415
+
+    keyframes.delete_for_recording(session, rec_id)
     session.delete(rec)
     session.commit()

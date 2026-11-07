@@ -31,6 +31,10 @@ class OverlayProfile:
     # overlay), and to split back-to-back matches on the number changing.
     match_label_region: Rect = (0.20, 0.00, 0.40, 0.13)
     timer_invert: bool = False
+    # Where each alliance's teams sit on the full-screen pre-match intro card
+    # (read when the trained intro detector finds one). Red left, blue right.
+    intro_red_teams_region: Rect = (0.00, 0.15, 0.50, 0.95)
+    intro_blue_teams_region: Rect = (0.50, 0.15, 1.00, 0.95)
 
     @classmethod
     def from_dict(cls, d: dict) -> "OverlayProfile":
@@ -48,6 +52,8 @@ class OverlayProfile:
             blue_score_region=rect("blue_score_region", (0.55, 0.80, 0.65, 0.97)),
             match_label_region=rect("match_label_region", (0.20, 0.00, 0.40, 0.13)),
             timer_invert=bool(d.get("timer_invert", False)),
+            intro_red_teams_region=rect("intro_red_teams_region", (0.00, 0.15, 0.50, 0.95)),
+            intro_blue_teams_region=rect("intro_blue_teams_region", (0.50, 0.15, 1.00, 0.95)),
         )
 
     def to_dict(self) -> dict:
@@ -61,6 +67,8 @@ class OverlayProfile:
             "blue_score_region": list(self.blue_score_region),
             "match_label_region": list(self.match_label_region),
             "timer_invert": self.timer_invert,
+            "intro_red_teams_region": list(self.intro_red_teams_region),
+            "intro_blue_teams_region": list(self.intro_blue_teams_region),
         }
 
 
